@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "Smart Math Kids",
+    "slug": "smart-math-kids",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#667eea"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.smartmathkids.app"
+    },
+    "android": {
+      "package": "com.smartmathkids.app"
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}
