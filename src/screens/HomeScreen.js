@@ -9,12 +9,14 @@ import {
   StatusBar,
   Animated,
   Image,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, GRADIENTS } from '../constants/colors';
 import { DIFFICULTY_CONFIG } from '../utils/mathGenerator';
 import { getHighScores } from '../utils/storage';
 import { useLanguage, LANGUAGES } from '../context/LanguageContext';
+import AdBanner from '../components/AdBanner';
 
 const { width, height } = Dimensions.get('window');
 
@@ -507,6 +509,11 @@ const HomeScreen = ({ navigation }) => {
           {/* Version info */}
           <Text style={styles.versionText}>v1.0.0 • {t('poweredBy')}</Text>
         </ScrollView>
+
+        {/* Banner Ad */}
+        {Platform.OS !== 'web' && (
+          <AdBanner style={styles.adBanner} />
+        )}
       </LinearGradient>
     </View>
   );
@@ -1088,6 +1095,13 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 10,
+  },
+  adBanner: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(5, 5, 16, 0.9)',
   },
 });
 

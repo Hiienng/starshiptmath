@@ -4,9 +4,12 @@
     "slug": "smart-math-kids",
     "version": "1.0.0",
     "orientation": "portrait",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
+    "icon": "./assets/icon.png",
     "splash": {
-      "backgroundColor": "#667eea"
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#050510"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -16,10 +19,33 @@
       "bundleIdentifier": "com.smartmathkids.app"
     },
     "android": {
-      "package": "com.smartmathkids.app"
+      "package": "com.smartmathkids.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#050510"
+      },
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE"
+      ]
     },
     "web": {
       "bundler": "metro"
+    },
+    "plugins": [
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-xxxxxxxxxxxxxxxx~yyyyyyyyyy",
+          "iosAppId": "ca-app-pub-xxxxxxxxxxxxxxxx~zzzzzzzzzz"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "your-project-id"
+      }
     }
   }
 }

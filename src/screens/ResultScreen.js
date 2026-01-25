@@ -8,6 +8,7 @@ import {
   Animated,
   Dimensions,
   StatusBar,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -15,6 +16,8 @@ import { COLORS, GRADIENTS } from '../constants/colors';
 import { DIFFICULTY_CONFIG, getRank } from '../utils/mathGenerator';
 import { saveHighScore } from '../utils/storage';
 import { useLanguage } from '../context/LanguageContext';
+import useInterstitialAd from '../hooks/useInterstitialAd';
+import AdBanner from '../components/AdBanner';
 
 const { width } = Dimensions.get('window');
 
@@ -23,6 +26,7 @@ const ResultScreen = ({ route, navigation }) => {
     route.params;
   const config = DIFFICULTY_CONFIG[difficulty];
   const { t, language } = useLanguage();
+  const { showAd } = useInterstitialAd();
 
   const [isNewRecord, setIsNewRecord] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
@@ -39,6 +43,11 @@ const ResultScreen = ({ route, navigation }) => {
 
   useEffect(() => {
     checkHighScore();
+
+    // Show interstitial ad (every 3 games)
+    if (Platform.OS !== 'web') {
+      showAd();
+    }
 
     // Entrance animations
     Animated.parallel([
@@ -363,6 +372,11 @@ const ResultScreen = ({ route, navigation }) => {
             )}
           </View>
         </ScrollView>
+
+        {/* Banner Ad */}
+        {Platform.OS !== 'web' && (
+          <AdBanner style={styles.adBanner} />
+        )}
       </LinearGradient>
     </View>
   );
@@ -658,6 +672,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.textSecondary,
     lineHeight: 20,
+  },
+  adBanner: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(26, 26, 46, 0.9)',
   },
 });
 
