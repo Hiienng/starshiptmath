@@ -44,25 +44,20 @@ const useInterstitialAd = () => {
     };
   }, []);
 
-  const showAd = useCallback(async () => {
+  const showAd = useCallback(async (force = false) => {
     if (Platform.OS === 'web') return false;
 
     try {
-      // Get current game count
       const countStr = await AsyncStorage.getItem(GAME_COUNT_KEY);
       let count = countStr ? parseInt(countStr, 10) : 0;
       count++;
-
-      // Save updated count
       await AsyncStorage.setItem(GAME_COUNT_KEY, count.toString());
 
-      // Check if we should show ad
-      if (count % AD_CONFIG.INTERSTITIAL_FREQUENCY === 0) {
-        if (isLoaded && interstitialAd) {
-          await new Promise(resolve => setTimeout(resolve, AD_CONFIG.INTERSTITIAL_DELAY));
-          interstitialAd.show();
-          return true;
-        }
+      const shouldShow = force || (count % AD_CONFIG.INTERSTITIAL_FREQUENCY === 0);
+      if (shouldShow && isLoaded && interstitialAd) {
+        await new Promise(resolve => setTimeout(resolve, AD_CONFIG.INTERSTITIAL_DELAY));
+        interstitialAd.show();
+        return true;
       }
     } catch (error) {
       console.log('Error showing interstitial:', error);

@@ -1,54 +1,54 @@
 // Cấu hình độ khó
 export const DIFFICULTY_CONFIG = {
   easy: {
-    name: 'Dễ',
+    name: 'Sao Kim',
     emoji: '🌟',
     description: '5-6 tuổi',
     maxNumber: 10,
-    operations: ['+', '-'],
-    timePerQuestion: 15, // giây
-    questionsCount: 10,
-    color: '#00b894',
+    operations: ['+'],
+    timePerQuestion: 15,
+    questionsCount: 5,
+    color: '#00E5FF',
   },
   medium: {
-    name: 'Trung bình',
-    emoji: '⭐',
+    name: 'Sao Mộc',
+    emoji: '🪐',
     description: '7-8 tuổi',
     maxNumber: 100,
-    operations: ['+', '-', '×'],
+    operations: ['+', '-'],
     timePerQuestion: 12,
-    questionsCount: 15,
-    color: '#fdcb6e',
+    questionsCount: 5,
+    color: '#FF4DB8',
   },
   hard: {
-    name: 'Khó',
+    name: 'Sao Hỏa',
     emoji: '🔥',
     description: '9-10 tuổi',
     maxNumber: 1000,
-    operations: ['+', '-', '×', '÷'],
+    operations: ['×'],
     timePerQuestion: 5,
-    questionsCount: 20,
-    color: '#e17055',
+    questionsCount: 5,
+    color: '#FF6D3B',
   },
   expert: {
-    name: 'Siêu khó',
+    name: 'Sao Thổ',
     emoji: '💎',
     description: '10+ tuổi',
     maxNumber: 1000,
-    operations: ['+', '-', '×', '÷'],
+    operations: ['×', '÷'],
     timePerQuestion: 2,
-    questionsCount: 25,
-    color: '#d63031',
+    questionsCount: 5,
+    color: '#AA44FF',
   },
   universe: {
-    name: 'Universe',
+    name: 'Hố Đen',
     emoji: '🌌',
     description: 'Ultimate Challenge',
     maxNumber: 9999,
     operations: ['+', '-', '×', '÷'],
     timePerQuestion: 1.5,
     questionsCount: 30,
-    color: '#1a0033',
+    color: '#8B5CF6',
   },
 };
 
@@ -58,7 +58,7 @@ const randomInt = (min, max) => {
 };
 
 // Tạo câu hỏi toán
-export const generateQuestion = (difficulty) => {
+export const generateQuestion = (difficulty, operandMultiplier = 1) => {
   const config = DIFFICULTY_CONFIG[difficulty];
   const operation = config.operations[randomInt(0, config.operations.length - 1)];
 
@@ -66,36 +66,36 @@ export const generateQuestion = (difficulty) => {
 
   switch (operation) {
     case '+':
-      num1 = randomInt(1, config.maxNumber);
-      num2 = randomInt(1, config.maxNumber);
+      num1 = randomInt(1, config.maxNumber * operandMultiplier);
+      num2 = randomInt(1, config.maxNumber * operandMultiplier);
       answer = num1 + num2;
       break;
 
     case '-':
       // Đảm bảo kết quả không âm
-      num1 = randomInt(1, config.maxNumber);
-      num2 = randomInt(1, num1); // num2 <= num1
+      num1 = randomInt(1, config.maxNumber * operandMultiplier);
+      num2 = randomInt(0, num1);
       answer = num1 - num2;
       break;
 
     case '×':
       // Giới hạn để kết quả không quá lớn
       const maxMultiplier = Math.min(12, Math.floor(config.maxNumber / 2));
-      num1 = randomInt(1, maxMultiplier);
-      num2 = randomInt(1, maxMultiplier);
+      num1 = randomInt(2, maxMultiplier * operandMultiplier);
+      num2 = randomInt(2, maxMultiplier);
       answer = num1 * num2;
       break;
 
     case '÷':
       // Đảm bảo kết quả là số nguyên
-      num2 = randomInt(1, 12); // Số chia từ 1-12
-      answer = randomInt(1, 12); // Kết quả từ 1-12
-      num1 = num2 * answer; // Số bị chia = số chia × kết quả
+      num2 = randomInt(2, 12 * operandMultiplier);
+      answer = randomInt(1, 12);
+      num1 = num2 * answer;
       break;
 
     default:
-      num1 = randomInt(1, config.maxNumber);
-      num2 = randomInt(1, config.maxNumber);
+      num1 = randomInt(1, config.maxNumber) * operandMultiplier;
+      num2 = randomInt(1, config.maxNumber) * operandMultiplier;
       answer = num1 + num2;
   }
 

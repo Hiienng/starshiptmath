@@ -19,15 +19,15 @@ const TEST_IDS = {
 // Production IDs - Replace these with your actual AdMob unit IDs
 const PRODUCTION_IDS = {
   BANNER: Platform.select({
-    android: 'ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY',
+    android: 'ca-app-pub-3524383584807120/5474314105',
     ios: 'ca-app-pub-XXXXXXXXXXXXXXXX/ZZZZZZZZZZ',
   }),
   INTERSTITIAL: Platform.select({
-    android: 'ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY',
+    android: 'ca-app-pub-3524383584807120/9624655568',
     ios: 'ca-app-pub-XXXXXXXXXXXXXXXX/ZZZZZZZZZZ',
   }),
   REWARDED: Platform.select({
-    android: 'ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY',
+    android: 'ca-app-pub-3524383584807120/8311573895',
     ios: 'ca-app-pub-XXXXXXXXXXXXXXXX/ZZZZZZZZZZ',
   }),
 };

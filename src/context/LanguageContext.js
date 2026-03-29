@@ -11,11 +11,11 @@ export const LANGUAGES = {
 export const TRANSLATIONS = {
   vi: {
     // Home Screen
-    appName: 'SMART',
+    appName: 'STARSHIP',
     appNameAccent: 'MATH',
-    subtitle: '⚡ LUYỆN PHẢN ỨNG NHANH QUA TOÁN HỌC ⚡',
+    subtitle: 'TOÁN HỌC PHẢN XẠ NHANH',
     selectChallenge: 'CHỌN THỬ THÁCH',
-    tip: 'Bắt đầu từ mức Dễ và tăng dần độ khó!',
+    tip: '',
     poweredBy: 'Powered by Fin Data Solution',
     questions: 'câu',
     perQuestion: 'mỗi câu',
@@ -24,15 +24,15 @@ export const TRANSLATIONS = {
     language: 'Ngôn ngữ',
 
     // Difficulty levels
-    easy: 'Dễ',
-    medium: 'Trung bình',
-    hard: 'Khó',
-    expert: 'Siêu khó',
-    universe: 'Universe',
-    easyDesc: 'Số từ 1-10, cộng trừ',
-    mediumDesc: 'Số từ 1-20, cộng trừ nhân',
-    hardDesc: 'Số từ 1-50, tất cả phép tính',
-    expertDesc: 'Số từ 1-100, siêu tốc độ',
+    easy: 'Sao Kim',
+    medium: 'Sao Mộc',
+    hard: 'Sao Hỏa',
+    expert: 'Sao Thổ',
+    universe: 'Hố Đen',
+    easyDesc: 'Số từ 1-10, chỉ cộng',
+    mediumDesc: 'Số từ 1-100, cộng và trừ',
+    hardDesc: 'Số lớn, chỉ nhân',
+    expertDesc: 'Số lớn, nhân và chia',
     universeDesc: 'Thử thách tối thượng',
 
     // Game Screen
@@ -61,11 +61,11 @@ export const TRANSLATIONS = {
   },
   en: {
     // Home Screen
-    appName: 'SMART',
+    appName: 'STARSHIP',
     appNameAccent: 'MATH',
-    subtitle: '⚡ QUICK REACTION MATH TRAINING ⚡',
+    subtitle: 'QUICK REACTION MATH',
     selectChallenge: 'SELECT CHALLENGE',
-    tip: 'Start from Easy and gradually increase difficulty!',
+    tip: '',
     poweredBy: 'Powered by Fin Data Solution',
     questions: 'Q',
     perQuestion: 'per Q',
@@ -74,15 +74,15 @@ export const TRANSLATIONS = {
     language: 'Language',
 
     // Difficulty levels
-    easy: 'Easy',
-    medium: 'Medium',
-    hard: 'Hard',
-    expert: 'Expert',
-    universe: 'Universe',
-    easyDesc: 'Numbers 1-10, add & subtract',
-    mediumDesc: 'Numbers 1-20, add, sub, multiply',
-    hardDesc: 'Numbers 1-50, all operations',
-    expertDesc: 'Numbers 1-100, super speed',
+    easy: 'Venus',
+    medium: 'Jupiter',
+    hard: 'Mars',
+    expert: 'Saturn',
+    universe: 'Black Hole',
+    easyDesc: 'Numbers 1-10, addition only',
+    mediumDesc: 'Numbers 1-100, add & subtract',
+    hardDesc: 'Large numbers, multiply only',
+    expertDesc: 'Large numbers, multiply & divide',
     universeDesc: 'Ultimate challenge',
 
     // Game Screen

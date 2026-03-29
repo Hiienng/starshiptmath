@@ -1,8 +1,9 @@
 {
   "expo": {
-    "name": "Smart Math Kids",
-    "slug": "smart-math-kids",
-    "version": "1.0.0",
+    "name": "Starship Math",
+    "slug": "startship-math",
+    "version": "1.1.0",
+    "runtimeVersion": "1.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "icon": "./assets/icon.png",
@@ -16,11 +17,12 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.smartmathkids.app"
+      "bundleIdentifier": "com.starshipmath.app"
     },
     "android": {
-      "package": "com.smartmathkids.app",
-      "versionCode": 1,
+      "package": "com.starshipmath.app",
+      "versionCode": 7,
+      "targetSdkVersion": 35,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#050510"
@@ -28,6 +30,9 @@
       "permissions": [
         "android.permission.INTERNET",
         "android.permission.ACCESS_NETWORK_STATE"
+      ],
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -35,17 +40,28 @@
     },
     "plugins": [
       [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35,
+            "minSdkVersion": 24
+          }
+        }
+      ],
+      [
         "react-native-google-mobile-ads",
         {
-          "androidAppId": "ca-app-pub-xxxxxxxxxxxxxxxx~yyyyyyyyyy",
+          "androidAppId": "ca-app-pub-3524383584807120~2277305123",
           "iosAppId": "ca-app-pub-xxxxxxxxxxxxxxxx~zzzzzzzzzz"
         }
       ]
     ],
     "extra": {
       "eas": {
-        "projectId": "your-project-id"
+        "projectId": "ceac2563-e494-433e-81aa-bb1d1a410580"
       }
-    }
+    },
+    "owner": "findatasolution"
   }
 }

@@ -5,8 +5,8 @@ import {
   StyleSheet,
   TouchableOpacity,
   Animated,
-  Dimensions,
   StatusBar,
+  useWindowDimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -17,15 +17,85 @@ import {
   calculateScore,
 } from '../utils/mathGenerator';
 import { useLanguage } from '../context/LanguageContext';
+import { loadSounds, playSound, playGameOver } from '../utils/soundManager';
+import RoundTransition from '../components/RoundTransition';
+import SpaceBackground from '../components/SpaceBackground';
 
-const { width, height } = Dimensions.get('window');
+
+// Answer button with press bounce animation
+const AnswerButton = ({ option, onPress, isAnswered, currentQuestion, selectedAnswer, isTablet }) => {
+  const pressAnim = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    if (isAnswered) return;
+    Animated.spring(pressAnim, { toValue: 0.92, useNativeDriver: true, speed: 50 }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(pressAnim, { toValue: 1, friction: 4, useNativeDriver: true }).start();
+  };
+
+  const getColors = () => {
+    if (isAnswered && option === currentQuestion.answer) return GRADIENTS.success;
+    if (isAnswered && option === selectedAnswer && option !== currentQuestion.answer) return GRADIENTS.danger;
+    return [COLORS.surface, COLORS.backgroundCard];
+  };
+
+  const getOpacity = () => {
+    if (!isAnswered) return 1;
+    if (option === currentQuestion.answer || option === selectedAnswer) return 1;
+    return 0.4;
+  };
+
+  const isHighlighted = isAnswered && (option === currentQuestion.answer || option === selectedAnswer);
+
+  return (
+    <Animated.View style={[styles.answerButton, isTablet && styles.answerButtonTablet, { transform: [{ scale: pressAnim }], opacity: getOpacity() }]}>
+      <TouchableOpacity
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        disabled={isAnswered}
+        activeOpacity={1}
+        style={{ flex: 1, borderRadius: 16, overflow: 'hidden' }}
+      >
+        <LinearGradient colors={getColors()} style={styles.answerGradient}>
+          <Text style={[styles.answerText, isTablet && styles.answerTextTablet, isHighlighted && styles.answerTextHighlight]}>
+            {option}
+          </Text>
+        </LinearGradient>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
+
+const MAX_LIVES = 5;
+const AD_FAIL_THRESHOLD = 5;
 
 const GameScreen = ({ route, navigation }) => {
-  const { difficulty } = route.params;
+  const { width } = useWindowDimensions();
+  const isTablet = width >= 768;
+  const {
+    difficulty,
+    totalFails = 0,
+    timeMultiplier: initTimeMultiplier = 1,
+    operandMultiplier: initOperandMultiplier = 1,
+  } = route.params;
   const config = DIFFICULTY_CONFIG[difficulty];
   const { t } = useLanguage();
 
-  // Feedback display time: 2 seconds for hard/expert/universe, 1.2 seconds for others
+  const [timeMultiplier, setTimeMultiplier] = useState(initTimeMultiplier);
+  const [operandMultiplier, setOperandMultiplier] = useState(initOperandMultiplier);
+  const [roundNumber, setRoundNumber] = useState(1);
+  const [showTransition, setShowTransition] = useState(false);
+  const gameOverParams = useRef({});
+  const nextRoundParams = useRef({ newTM: 1, newOM: 1, newRound: 2, newEffectiveTime: config.timePerQuestion });
+  const totalQuestionsPlayed = useRef(0);
+
+  // Thời gian hiệu lực (giảm 1/3 mỗi lần win)
+  const effectiveTime = Math.max(1, Math.round(config.timePerQuestion * timeMultiplier));
+
+  // Feedback display time
   const feedbackDisplayTime = (difficulty === 'hard' || difficulty === 'expert' || difficulty === 'universe') ? 2000 : 1200;
 
   // Game state
@@ -33,10 +103,11 @@ const GameScreen = ({ route, navigation }) => {
   const [questionIndex, setQuestionIndex] = useState(0);
   const [score, setScore] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(config.timePerQuestion);
+  const [timeLeft, setTimeLeft] = useState(effectiveTime);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [isAnswered, setIsAnswered] = useState(false);
   const [gameResults, setGameResults] = useState([]);
+  const [livesLeft, setLivesLeft] = useState(MAX_LIVES);
 
   // Animation refs
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -48,7 +119,13 @@ const GameScreen = ({ route, navigation }) => {
   // Timer ref
   const timerRef = useRef(null);
 
+  // Score popup animation
+  const popupY = useRef(new Animated.Value(0)).current;
+  const popupOpacity = useRef(new Animated.Value(0)).current;
+  const [popupScore, setPopupScore] = useState(0);
+
   useEffect(() => {
+    loadSounds();
     generateNewQuestion();
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
@@ -58,6 +135,7 @@ const GameScreen = ({ route, navigation }) => {
   // Pulse animation for timer when low
   useEffect(() => {
     if (timeLeft <= 3 && timeLeft > 0 && !isAnswered) {
+      playSound('countdown');
       Animated.sequence([
         Animated.timing(pulseAnim, {
           toValue: 1.2,
@@ -79,7 +157,7 @@ const GameScreen = ({ route, navigation }) => {
     progressAnim.setValue(1);
     Animated.timing(progressAnim, {
       toValue: 0,
-      duration: config.timePerQuestion * 1000,
+      duration: effectiveTime * 1000,
       useNativeDriver: false,
     }).start();
 
@@ -99,10 +177,37 @@ const GameScreen = ({ route, navigation }) => {
     };
   }, [currentQuestion, isAnswered]);
 
-  const generateNewQuestion = () => {
-    const question = generateQuestion(difficulty);
+  const getQuestionFontSize = (n1, n2) => {
+    const digits = Math.max(String(n1).length, String(n2).length);
+    if (digits <= 2) return 64;
+    if (digits <= 4) return 48;
+    if (digits <= 6) return 36;
+    return 28;
+  };
+
+  const startNextRound = (newTM, newOM, newRound) => {
+    const question = generateQuestion(difficulty, newOM);
+    const newEffectiveTime = Math.max(1, Math.round(config.timePerQuestion * newTM));
+    setTimeMultiplier(newTM);
+    setOperandMultiplier(newOM);
+    setRoundNumber(newRound);
+    setQuestionIndex(0);
     setCurrentQuestion(question);
-    setTimeLeft(config.timePerQuestion);
+    setTimeLeft(newEffectiveTime);
+    setSelectedAnswer(null);
+    setIsAnswered(false);
+    fadeAnim.setValue(0);
+    scaleAnim.setValue(0.8);
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+      Animated.spring(scaleAnim, { toValue: 1, friction: 5, useNativeDriver: true }),
+    ]).start();
+  };
+
+  const generateNewQuestion = () => {
+    const question = generateQuestion(difficulty, operandMultiplier);
+    setCurrentQuestion(question);
+    setTimeLeft(effectiveTime);
     setSelectedAnswer(null);
     setIsAnswered(false);
 
@@ -126,6 +231,7 @@ const GameScreen = ({ route, navigation }) => {
     if (isAnswered) return;
     setIsAnswered(true);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    playSound('timeout');
 
     setGameResults((prev) => [
       ...prev,
@@ -134,12 +240,20 @@ const GameScreen = ({ route, navigation }) => {
         correct: false,
         userAnswer: null,
         correctAnswer: currentQuestion.answer,
-        timeUsed: config.timePerQuestion,
+        timeUsed: effectiveTime,
       },
     ]);
 
     shakeAnimation();
-    setTimeout(moveToNextQuestion, 1500);
+    setLivesLeft((prev) => {
+      const next = prev - 1;
+      if (next <= 0) {
+        setTimeout(handleGameOver, 1000);
+      } else {
+        setTimeout(moveToNextQuestion, 1500);
+      }
+      return next;
+    });
   };
 
   const handleAnswer = (answer) => {
@@ -154,7 +268,9 @@ const GameScreen = ({ route, navigation }) => {
 
     if (isCorrect) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      const points = calculateScore(true, timeLeft, config.timePerQuestion);
+      playSound('correct');
+      const points = calculateScore(true, timeLeft, effectiveTime);
+      showScorePopup(points);
       setScore((prev) => prev + points);
       setCorrectCount((prev) => prev + 1);
 
@@ -172,7 +288,17 @@ const GameScreen = ({ route, navigation }) => {
       ]).start();
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      playSound('wrong');
       shakeAnimation();
+      setLivesLeft((prev) => {
+        const next = prev - 1;
+        if (next <= 0) {
+          setTimeout(handleGameOver, feedbackDisplayTime);
+        } else {
+          setTimeout(moveToNextQuestion, feedbackDisplayTime);
+        }
+        return next;
+      });
     }
 
     setGameResults((prev) => [
@@ -186,7 +312,40 @@ const GameScreen = ({ route, navigation }) => {
       },
     ]);
 
-    setTimeout(moveToNextQuestion, feedbackDisplayTime);
+    totalQuestionsPlayed.current += 1;
+    if (isCorrect) setTimeout(moveToNextQuestion, feedbackDisplayTime);
+  };
+
+  const handleGameOver = () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    playGameOver();
+    const newTotalFails = totalFails + 1;
+    gameOverParams.current = {
+      difficulty,
+      score,
+      correctCount,
+      totalQuestions: Math.max(1, totalQuestionsPlayed.current),
+      gameResults,
+      failed: true,
+      totalFails: newTotalFails,
+      nextTimeMultiplier: timeMultiplier,
+      nextOperandMultiplier: operandMultiplier,
+      mustWatchAd: newTotalFails >= AD_FAIL_THRESHOLD,
+    };
+    navigation.replace('Result', gameOverParams.current);
+  };
+
+  const showScorePopup = (points) => {
+    setPopupScore(points);
+    popupY.setValue(0);
+    popupOpacity.setValue(1);
+    Animated.parallel([
+      Animated.timing(popupY, { toValue: -70, duration: 700, useNativeDriver: true }),
+      Animated.sequence([
+        Animated.delay(300),
+        Animated.timing(popupOpacity, { toValue: 0, duration: 400, useNativeDriver: true }),
+      ]),
+    ]).start();
   };
 
   const shakeAnimation = () => {
@@ -202,21 +361,30 @@ const GameScreen = ({ route, navigation }) => {
     const nextIndex = questionIndex + 1;
 
     if (nextIndex >= config.questionsCount) {
-      navigation.replace('Result', {
-        difficulty,
-        score,
-        correctCount: correctCount + (selectedAnswer === currentQuestion?.answer ? 1 : 0),
-        totalQuestions: config.questionsCount,
-        gameResults,
-      });
+      // Round complete — cinematic transition to next round
+      const newTM = timeMultiplier * (2 / 3);
+      const newOM = operandMultiplier * 10;
+      const newRound = roundNumber + 1;
+      const newEffectiveTime = Math.max(1, Math.round(config.timePerQuestion * newTM));
+
+      nextRoundParams.current = { newTM, newOM, newRound, newEffectiveTime };
+      setShowTransition(true);
+      playSound('complete');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } else {
       setQuestionIndex(nextIndex);
       generateNewQuestion();
     }
   };
 
+  const handleTransitionComplete = () => {
+    setShowTransition(false);
+    const { newTM, newOM, newRound } = nextRoundParams.current;
+    startNextRound(newTM, newOM, newRound);
+  };
+
   const getTimerColor = () => {
-    const percentage = timeLeft / config.timePerQuestion;
+    const percentage = timeLeft / effectiveTime;
     if (percentage > 0.5) return COLORS.timerNormal;
     if (percentage > 0.25) return COLORS.timerWarning;
     return COLORS.timerDanger;
@@ -232,31 +400,13 @@ const GameScreen = ({ route, navigation }) => {
     }
   };
 
-  const getAnswerStyle = (answer) => {
-    const baseStyle = [styles.answerButton];
-
-    if (!isAnswered) {
-      return baseStyle;
-    }
-
-    if (answer === currentQuestion.answer) {
-      return [...baseStyle, styles.correctAnswer];
-    }
-
-    if (answer === selectedAnswer && answer !== currentQuestion.answer) {
-      return [...baseStyle, styles.wrongAnswer];
-    }
-
-    return [...baseStyle, styles.disabledAnswer];
-  };
-
   const getFeedbackText = () => {
     if (selectedAnswer === currentQuestion.answer) {
-      return `🎉 ${t('correct')}`;
+      return t('correct');
     } else if (selectedAnswer === null) {
-      return `⏰ ${t('timeUp')}`;
+      return t('timeUp');
     } else {
-      return `❌ ${t('incorrect')}`;
+      return t('incorrect');
     }
   };
 
@@ -268,13 +418,6 @@ const GameScreen = ({ route, navigation }) => {
     );
   }
 
-  const progressWidth = progressAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0%', '100%'],
-  });
-
-  const timerProgress = timeLeft / config.timePerQuestion;
-
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
@@ -283,21 +426,9 @@ const GameScreen = ({ route, navigation }) => {
         colors={[COLORS.background, COLORS.backgroundLight]}
         style={styles.backgroundGradient}
       >
-        {/* Circular Timer Background */}
-        <View style={styles.timerCircleContainer}>
-          <View style={[styles.timerCircle, { borderColor: getTimerColor() }]}>
-            <Animated.Text
-              style={[
-                styles.timerNumber,
-                { color: getTimerColor(), transform: [{ scale: pulseAnim }] },
-              ]}
-            >
-              {timeLeft}
-            </Animated.Text>
-          </View>
-        </View>
+        <SpaceBackground />
 
-        {/* Mini Header */}
+          {/* Mini Header */}
         <View style={styles.miniHeader}>
           <TouchableOpacity
             style={styles.closeButton}
@@ -320,6 +451,10 @@ const GameScreen = ({ route, navigation }) => {
             </Text>
           </View>
 
+          <Animated.View style={[styles.timerCircle, { borderColor: getTimerColor(), transform: [{ scale: pulseAnim }] }]}>
+            <Text style={[styles.timerNumber, { color: getTimerColor() }]}>{timeLeft}</Text>
+          </Animated.View>
+
           <View style={styles.scoreBox}>
             <Text style={styles.scoreValue}>{score}</Text>
             <Text style={styles.scoreLabel}>{t('score')}</Text>
@@ -336,86 +471,66 @@ const GameScreen = ({ route, navigation }) => {
             },
           ]}
         >
-          {/* Operation Badge */}
-          <View style={[styles.operationBadge, { backgroundColor: getOperationColor() }]}>
-            <Text style={styles.operationText}>{currentQuestion.operation}</Text>
-          </View>
-
           {/* Question */}
           <View style={styles.questionBox}>
-            <Text style={styles.questionNumber}>{currentQuestion.num1}</Text>
-            <Text style={[styles.questionOperator, { color: getOperationColor() }]}>
+            <Text style={[styles.questionNumber, { fontSize: getQuestionFontSize(currentQuestion.num1, currentQuestion.num2) }]}>{currentQuestion.num1}</Text>
+            <Text style={[styles.questionOperator, { color: getOperationColor(), fontSize: getQuestionFontSize(currentQuestion.num1, currentQuestion.num2) * 0.75 }]}>
               {currentQuestion.operation}
             </Text>
-            <Text style={styles.questionNumber}>{currentQuestion.num2}</Text>
+            <Text style={[styles.questionNumber, { fontSize: getQuestionFontSize(currentQuestion.num1, currentQuestion.num2) }]}>{currentQuestion.num2}</Text>
           </View>
 
           <Text style={styles.equalSign}>= ?</Text>
 
-          {/* Feedback */}
-          {isAnswered && (
-            <View
+          {/* Floating score popup */}
+          <Animated.Text style={[styles.scorePopup, { opacity: popupOpacity, transform: [{ translateY: popupY }] }]}>
+            +{popupScore} pts
+          </Animated.Text>
+
+        </Animated.View>
+
+        {/* Feedback — absolute at top centre */}
+        {isAnswered && (
+          <View
+            style={[
+              styles.feedbackBadge,
+              {
+                backgroundColor:
+                  selectedAnswer === currentQuestion.answer
+                    ? COLORS.correctBg
+                    : COLORS.wrongBg,
+              },
+            ]}
+          >
+            <Text
               style={[
-                styles.feedbackBadge,
+                styles.feedbackText,
                 {
-                  backgroundColor:
+                  color:
                     selectedAnswer === currentQuestion.answer
-                      ? COLORS.correctBg
-                      : COLORS.wrongBg,
+                      ? COLORS.correct
+                      : COLORS.wrong,
                 },
               ]}
             >
-              <Text
-                style={[
-                  styles.feedbackText,
-                  {
-                    color:
-                      selectedAnswer === currentQuestion.answer
-                        ? COLORS.correct
-                        : COLORS.wrong,
-                  },
-                ]}
-              >
-                {getFeedbackText()}
-              </Text>
-            </View>
-          )}
-        </Animated.View>
+              {getFeedbackText()}
+            </Text>
+          </View>
+        )}
 
         {/* Answer Grid */}
-        <View style={styles.answersArea}>
+        <View style={[styles.answersArea, isTablet && { maxWidth: 640, alignSelf: 'center', width: '100%' }]}>
           <View style={styles.answersGrid}>
             {currentQuestion.options.map((option, index) => (
-              <TouchableOpacity
+              <AnswerButton
                 key={index}
-                style={getAnswerStyle(option)}
-                onPress={() => handleAnswer(option)}
-                disabled={isAnswered}
-                activeOpacity={0.8}
-              >
-                <LinearGradient
-                  colors={
-                    isAnswered && option === currentQuestion.answer
-                      ? GRADIENTS.success
-                      : isAnswered && option === selectedAnswer && option !== currentQuestion.answer
-                      ? GRADIENTS.danger
-                      : [COLORS.surface, COLORS.backgroundCard]
-                  }
-                  style={styles.answerGradient}
-                >
-                  <Text
-                    style={[
-                      styles.answerText,
-                      isAnswered &&
-                        (option === currentQuestion.answer ||
-                          option === selectedAnswer) &&
-                        styles.answerTextHighlight,
-                    ]}
-                  >
-                    {option}
-                  </Text>
-                </LinearGradient>
-              </TouchableOpacity>
+                option={option}
+                onPress={() => { playSound('tap'); handleAnswer(option); }}
+                isAnswered={isAnswered}
+                currentQuestion={currentQuestion}
+                selectedAnswer={selectedAnswer}
+                isTablet={isTablet}
+              />
             ))}
           </View>
         </View>
@@ -423,13 +538,31 @@ const GameScreen = ({ route, navigation }) => {
         {/* Bottom Stats */}
         <View style={styles.bottomStats}>
           <View style={styles.statBadge}>
-            <Text style={styles.statIcon}>✓</Text>
             <Text style={styles.statText}>
               {correctCount}/{questionIndex + (isAnswered ? 1 : 0)}
             </Text>
           </View>
+          <View style={styles.livesRow}>
+            {Array.from({ length: MAX_LIVES }).map((_, i) => (
+              <Text key={i} style={[styles.heartIcon, i >= livesLeft && styles.heartLost]}>
+                {i < livesLeft ? '❤️' : '🖤'}
+              </Text>
+            ))}
+          </View>
         </View>
+
+
       </LinearGradient>
+
+      {/* Cinematic round transition */}
+      <RoundTransition
+        visible={showTransition}
+        fromRound={roundNumber}
+        toRound={nextRoundParams.current.newRound}
+        newEffectiveTime={nextRoundParams.current.newEffectiveTime}
+        onComplete={handleTransitionComplete}
+      />
+
     </View>
   );
 };
@@ -452,23 +585,18 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: COLORS.textSecondary,
   },
-  timerCircleContainer: {
-    position: 'absolute',
-    top: 80,
-    right: 20,
-    zIndex: 10,
-  },
   timerCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    borderWidth: 4,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 3,
     backgroundColor: COLORS.backgroundCard,
     justifyContent: 'center',
     alignItems: 'center',
+    marginHorizontal: 6,
   },
   timerNumber: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: 'bold',
   },
   miniHeader: {
@@ -553,9 +681,10 @@ const styles = StyleSheet.create({
   },
   questionNumber: {
     fontSize: 64,
-    fontWeight: 'bold',
+    fontWeight: '300',
     color: COLORS.text,
     marginHorizontal: 10,
+    letterSpacing: 2,
   },
   questionOperator: {
     fontSize: 48,
@@ -567,15 +696,28 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     marginTop: 10,
   },
+  scorePopup: {
+    position: 'absolute',
+    fontSize: 26,
+    fontWeight: 'bold',
+    color: '#4ADE80',
+    textShadowColor: 'rgba(0,0,0,0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
   feedbackBadge: {
-    marginTop: 20,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    position: 'absolute',
+    top: 100,
+    alignSelf: 'center',
+    paddingHorizontal: 22,
+    paddingVertical: 9,
     borderRadius: 20,
+    zIndex: 100,
   },
   feedbackText: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: 'bold',
+    letterSpacing: 0.5,
   },
   answersArea: {
     paddingHorizontal: 15,
@@ -587,11 +729,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   answerButton: {
-    width: (width - 45) / 2,
+    width: '48%',
     height: 70,
     marginBottom: 10,
     borderRadius: 16,
     overflow: 'hidden',
+  },
+  answerButtonTablet: {
+    height: 100,
   },
   answerGradient: {
     flex: 1,
@@ -612,6 +757,9 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     color: COLORS.text,
+  },
+  answerTextTablet: {
+    fontSize: 36,
   },
   answerTextHighlight: {
     color: COLORS.white,
@@ -637,6 +785,17 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     fontSize: 14,
     fontWeight: '600',
+  },
+  livesRow: {
+    flexDirection: 'row',
+    marginTop: 8,
+  },
+  heartIcon: {
+    fontSize: 20,
+    marginHorizontal: 2,
+  },
+  heartLost: {
+    opacity: 0.3,
   },
 });
 

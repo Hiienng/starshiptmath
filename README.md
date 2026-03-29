@@ -1,4 +1,4 @@
-# Smart Math Kids
+# Starship Math
 
 Mini game toán học giúp trẻ em luyện phản ứng nhanh thông qua các bài toán đơn giản.
 
@@ -19,7 +19,7 @@ Mini game toán học giúp trẻ em luyện phản ứng nhanh thông qua các 
 
 ### Bước 1: Cài đặt dependencies
 ```bash
-cd "smart math kids"
+cd "Starship Math"
 npm install
 ```
 
@@ -85,7 +85,7 @@ npx expo export:web
 ## Cấu trúc project
 
 ```
-smart-math-kids/
+starship-math/
 ├── App.js                 # Entry point
 ├── app.json              # Expo config
 ├── package.json

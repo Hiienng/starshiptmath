@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,148 +6,197 @@ import {
   TouchableOpacity,
   ScrollView,
   Animated,
+  Easing,
   Dimensions,
   StatusBar,
   Platform,
 } from 'react-native';
+
+const { width: SW, height: SH } = Dimensions.get('window');
+
+const CONFETTI_COLORS = ['#FFD700', '#FF6B6B', '#4ECDC4', '#6C63FF', '#FF6B9D', '#00E5FF', '#FF4DB8'];
+
+const PARTICLES = Array.from({ length: 22 }, (_, i) => ({
+  id: i,
+  color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+  size: 6 + (i % 4) * 3,
+  startX: SW * 0.1 + (i / 22) * SW * 0.8,
+  angle: (i / 22) * Math.PI * 2,
+  radius: 80 + (i % 5) * 40,
+  delay: (i % 6) * 80,
+}));
+
+const ConfettiParticle = ({ color, size, startX, angle, radius, delay }) => {
+  const y     = useRef(new Animated.Value(0)).current;
+  const x     = useRef(new Animated.Value(0)).current;
+  const alpha = useRef(new Animated.Value(0)).current;
+  const rot   = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const dx = Math.cos(angle) * radius;
+    setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(alpha, { toValue: 1, duration: 120, useNativeDriver: true }),
+        Animated.timing(x, { toValue: dx, duration: 700, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        Animated.timing(y, { toValue: SH * 0.55, duration: 1600, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+        Animated.timing(rot, { toValue: 1, duration: 1600, useNativeDriver: true }),
+        Animated.sequence([
+          Animated.delay(600),
+          Animated.timing(alpha, { toValue: 0, duration: 700, useNativeDriver: true }),
+        ]),
+      ]).start();
+    }, delay);
+  }, []);
+
+  const rotate = rot.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '540deg'] });
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        left: startX,
+        top: SH * 0.12,
+        width: size,
+        height: size,
+        borderRadius: size / 3,
+        backgroundColor: color,
+        opacity: alpha,
+        transform: [{ translateX: x }, { translateY: y }, { rotate }],
+        zIndex: 999,
+      }}
+    />
+  );
+};
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { COLORS, GRADIENTS } from '../constants/colors';
-import { DIFFICULTY_CONFIG, getRank } from '../utils/mathGenerator';
-import { saveHighScore } from '../utils/storage';
+import { DIFFICULTY_CONFIG } from '../utils/mathGenerator';
+import { saveHighScore, getHighScoreByDifficulty } from '../utils/storage';
 import { useLanguage } from '../context/LanguageContext';
+import { playSound } from '../utils/soundManager';
 import useInterstitialAd from '../hooks/useInterstitialAd';
 import AdBanner from '../components/AdBanner';
 
-const { width } = Dimensions.get('window');
+
 
 const ResultScreen = ({ route, navigation }) => {
-  const { difficulty, score, correctCount, totalQuestions, gameResults } =
-    route.params;
+  const {
+    difficulty, score, correctCount, totalQuestions, gameResults,
+    failed = false,
+    totalFails = 0,
+    nextTimeMultiplier = 1,
+    nextOperandMultiplier = 1,
+    mustWatchAd = false,
+  } = route.params;
   const config = DIFFICULTY_CONFIG[difficulty];
   const { t, language } = useLanguage();
   const { showAd } = useInterstitialAd();
 
   const [isNewRecord, setIsNewRecord] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [displayScore, setDisplayScore] = useState(0);
+  const [highScore, setHighScore] = useState(score);
+
+  // Max realm score = 5 perfect rounds (questionsCount × 20pts × 5)
+  const MAX_REALM_SCORE = config.questionsCount * 20 * 5;
 
   // Animations
-  const scaleAnim = useRef(new Animated.Value(0)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(50)).current;
-  const rotateAnim = useRef(new Animated.Value(0)).current;
-  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const fadeAnim   = useRef(new Animated.Value(0)).current;
+  const slideAnim  = useRef(new Animated.Value(60)).current;
+  const scaleAnim  = useRef(new Animated.Value(0.82)).current;
+  const scoreScale = useRef(new Animated.Value(0.4)).current;
+  const bar1Anim   = useRef(new Animated.Value(0)).current;
+  const bar2Anim   = useRef(new Animated.Value(0)).current;
+  const statsAnim  = useRef(new Animated.Value(0)).current;
+  const btnAnim    = useRef(new Animated.Value(40)).current;
 
   const accuracy = (correctCount / totalQuestions) * 100;
-  const rankInfo = getRank(accuracy);
 
   useEffect(() => {
     checkHighScore();
+    if (Platform.OS !== 'web') showAd(mustWatchAd);
 
-    // Show interstitial ad (every 3 games)
-    if (Platform.OS !== 'web') {
-      showAd();
-    }
-
-    // Entrance animations
-    Animated.parallel([
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        friction: 5,
-        tension: 40,
-        useNativeDriver: true,
-      }),
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 600,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 500,
-        useNativeDriver: true,
-      }),
+    // Staggered entrance
+    Animated.sequence([
+      Animated.parallel([
+        Animated.timing(fadeAnim,  { toValue: 1, duration: 400, useNativeDriver: true }),
+        Animated.spring(scaleAnim, { toValue: 1, friction: 6, tension: 80, useNativeDriver: true }),
+        Animated.timing(slideAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
+      ]),
+      Animated.spring(scoreScale, { toValue: 1, friction: 4, tension: 70, useNativeDriver: true }),
+      Animated.parallel([
+        Animated.timing(bar1Anim, { toValue: 1, duration: 500, useNativeDriver: false }),
+        Animated.timing(bar2Anim, { toValue: 1, duration: 600, delay: 120, useNativeDriver: false }),
+      ]),
+      Animated.parallel([
+        Animated.spring(statsAnim, { toValue: 1, friction: 5, tension: 60, useNativeDriver: true }),
+        Animated.timing(btnAnim,   { toValue: 0, duration: 300, useNativeDriver: true }),
+      ]),
     ]).start();
 
-    // Rotation for rank badge
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(rotateAnim, {
-          toValue: 1,
-          duration: 3000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(rotateAnim, {
-          toValue: 0,
-          duration: 3000,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-
-    // Pulse animation for new record
-    if (isNewRecord) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.1,
-            duration: 500,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 1,
-            duration: 500,
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
+    if (failed) {
+      playSound('wrong');
+    } else {
+      playSound('complete');
+      if (accuracy >= 70) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
+  }, []);
 
-    if (accuracy >= 70) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
-  }, [isNewRecord]);
+  // Score count-up animation
+  useEffect(() => {
+    if (score === 0) return;
+    const steps = 30;
+    const stepTime = 1200 / steps;
+    let step = 0;
+    const timer = setInterval(() => {
+      step++;
+      setDisplayScore(Math.round((step / steps) * score));
+      if (step >= steps) clearInterval(timer);
+    }, stepTime);
+    return () => clearInterval(timer);
+  }, []);
 
   const checkHighScore = async () => {
+    const existing = await getHighScoreByDifficulty(difficulty);
+    const prevBest = existing?.score ?? 0;
     const newRecord = await saveHighScore(difficulty, score, accuracy);
+    const best = newRecord ? score : Math.max(prevBest, score);
+    setHighScore(best);
     setIsNewRecord(newRecord);
     if (newRecord) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      playSound('newRecord');
     }
   };
 
-  const playAgain = () => {
-    navigation.replace('Game', { difficulty });
+  const continueAfterFail = () => {
+    playSound('tap');
+    navigation.replace('Game', {
+      difficulty,
+      totalFails,
+      timeMultiplier: nextTimeMultiplier,
+      operandMultiplier: nextOperandMultiplier,
+    });
   };
 
   const goHome = () => {
+    playSound('tap');
     navigation.navigate('Home');
   };
 
-  const getGradientByRank = () => {
-    switch (rankInfo.rank) {
-      case 'S': return GRADIENTS.gold;
-      case 'A': return GRADIENTS.success;
-      case 'B': return GRADIENTS.primary;
-      default: return [COLORS.surface, COLORS.backgroundCard];
-    }
+  const getRealmInfo = (pct) => {
+    if (pct >= 95) return { name: 'Thiên Đạo',  emoji: '🌌', color: '#FFD700' };
+    if (pct >= 80) return { name: 'Nguyên Anh', emoji: '👑', color: '#CC44FF' };
+    if (pct >= 65) return { name: 'Kim Đan',    emoji: '💎', color: '#0099FF' };
+    if (pct >= 50) return { name: 'Trúc Cơ',   emoji: '🔥', color: '#FF6600' };
+    if (pct >= 30) return { name: 'Luyện Khí',  emoji: '⚡', color: '#00CC88' };
+    if (pct >= 15) return { name: 'Nhập Môn',   emoji: '⭐', color: '#AABBCC' };
+    return           { name: 'Thường Nhân', emoji: '🌱', color: '#778899' };
   };
 
-  const getRankTitle = (acc) => {
-    if (acc >= 90) return t('excellent');
-    if (acc >= 70) return t('great');
-    if (acc >= 50) return t('good');
-    return t('keepPracticing');
-  };
-
-  const getDifficultyName = () => {
-    return t(difficulty);
-  };
-
-  const spin = rotateAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['-5deg', '5deg'],
-  });
+  const realmPct = Math.min(100, Math.round((highScore / MAX_REALM_SCORE) * 100));
+  const realmInfo = getRealmInfo(realmPct);
 
   return (
     <View style={styles.container}>
@@ -157,130 +206,109 @@ const ResultScreen = ({ route, navigation }) => {
         colors={[COLORS.background, COLORS.backgroundLight]}
         style={styles.backgroundGradient}
       >
-        {/* Decorative circles */}
-        <View style={styles.decorCircle1} />
-        <View style={styles.decorCircle2} />
-        <View style={styles.decorCircle3} />
+        {/* Celebration particles */}
+        {PARTICLES.map(p => <ConfettiParticle key={p.id} {...p} />)}
 
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Rank Section */}
-          <Animated.View
-            style={[
-              styles.rankSection,
-              {
-                opacity: fadeAnim,
-                transform: [{ scale: scaleAnim }, { rotate: spin }],
-              },
-            ]}
-          >
-            <LinearGradient
-              colors={getGradientByRank()}
-              style={styles.rankCard}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
-              <View style={styles.rankGlow} />
-              <Text style={styles.rankEmoji}>{rankInfo.emoji}</Text>
-              <Text style={styles.rankLabel}>{language === 'vi' ? 'Hạng' : 'Rank'}</Text>
-              <Text style={styles.rankValue}>{rankInfo.rank}</Text>
-              <Text style={styles.rankTitle}>{getRankTitle(accuracy)}</Text>
-            </LinearGradient>
-          </Animated.View>
+          <Animated.View style={{
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }, { scale: scaleAnim }],
+            width: '100%',
+          }}>
 
-          {/* New Record Badge */}
-          {isNewRecord && (
-            <Animated.View
-              style={[styles.newRecordContainer, { transform: [{ scale: pulseAnim }] }]}
-            >
-              <LinearGradient
-                colors={GRADIENTS.gold}
-                style={styles.newRecordBadge}
-              >
-                <Text style={styles.newRecordText}>🏆 {t('newRecord')}</Text>
+          {/* ── Score + stats ── */}
+          <View style={styles.scoreSection}>
+            {isNewRecord && (
+              <LinearGradient colors={GRADIENTS.gold} style={styles.newRecordInline}>
+                <Text style={styles.newRecordInlineText}>{t('newRecord')}</Text>
               </LinearGradient>
-            </Animated.View>
-          )}
+            )}
 
-          {/* Score Display */}
-          <Animated.View
-            style={[
-              styles.scoreSection,
-              { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
-            ]}
-          >
-            <View style={styles.mainScoreCard}>
-              <Text style={styles.scoreLabel}>{t('totalScore')}</Text>
-              <Text style={styles.mainScore}>{score}</Text>
-              <View style={styles.accuracyBar}>
-                <View
-                  style={[
-                    styles.accuracyFill,
-                    {
-                      width: `${accuracy}%`,
-                      backgroundColor: accuracy >= 70 ? COLORS.correct : COLORS.wrong,
-                    },
-                  ]}
-                />
-              </View>
-              <Text style={styles.accuracyText}>{Math.round(accuracy)}% {t('accuracy')}</Text>
+            <Text style={styles.scoreLabel}>{t('totalScore')}</Text>
+            <Animated.Text style={[styles.mainScore, { transform: [{ scale: scoreScale }] }]}>
+              {displayScore}
+            </Animated.Text>
+
+            <View style={styles.barRow}>
+              <Text style={styles.barLabel}>{t('accuracy')}</Text>
+              <Text style={styles.barValue}>{Math.round(accuracy)}%</Text>
+            </View>
+            <View style={styles.trackBar}>
+              <Animated.View style={[styles.trackFill, {
+                width: bar1Anim.interpolate({ inputRange: [0, 1], outputRange: ['0%', `${accuracy}%`] }),
+                backgroundColor: accuracy >= 70 ? COLORS.correct : COLORS.wrong,
+              }]} />
             </View>
 
-            {/* Stats Grid */}
-            <View style={styles.statsGrid}>
+            <View style={[styles.barRow, { marginTop: 14 }]}>
+              <Text style={styles.barLabel}>
+                {language === 'vi' ? 'Độ nhanh' : 'Speed'}
+              </Text>
+              <Text style={[styles.barValue, { color: realmInfo.color }]}>{realmPct}%</Text>
+            </View>
+            <View style={styles.trackBar}>
+              <Animated.View style={[styles.trackFill, {
+                width: bar2Anim.interpolate({ inputRange: [0, 1], outputRange: ['0%', `${realmPct}%`] }),
+                backgroundColor: realmInfo.color,
+              }]} />
+            </View>
+            <Text style={styles.realmSub}>
+              {language === 'vi' ? `Kỷ lục: ${highScore} pts` : `Best: ${highScore} pts`}
+            </Text>
+
+            <Animated.View style={[styles.statsGrid, {
+              opacity: statsAnim,
+              transform: [{ scale: statsAnim.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] }) }],
+            }]}>
               <View style={styles.statBox}>
-                <LinearGradient colors={GRADIENTS.success} style={styles.statIconBg}>
-                  <Text style={styles.statIcon}>✓</Text>
-                </LinearGradient>
-                <Text style={styles.statNumber}>{correctCount}</Text>
+                <Text style={[styles.statNumber, { color: COLORS.correct }]}>{correctCount}</Text>
                 <Text style={styles.statLabel2}>{t('correctAnswers')}</Text>
               </View>
-
+              <View style={styles.statDivider} />
               <View style={styles.statBox}>
-                <LinearGradient colors={GRADIENTS.danger} style={styles.statIconBg}>
-                  <Text style={styles.statIcon}>✗</Text>
-                </LinearGradient>
-                <Text style={styles.statNumber}>{totalQuestions - correctCount}</Text>
+                <Text style={[styles.statNumber, { color: COLORS.wrong }]}>{totalQuestions - correctCount}</Text>
                 <Text style={styles.statLabel2}>{language === 'vi' ? 'Sai' : 'Wrong'}</Text>
               </View>
-
+              <View style={styles.statDivider} />
               <View style={styles.statBox}>
-                <LinearGradient colors={GRADIENTS.primary} style={styles.statIconBg}>
-                  <Text style={styles.statIcon}>📝</Text>
-                </LinearGradient>
                 <Text style={styles.statNumber}>{totalQuestions}</Text>
                 <Text style={styles.statLabel2}>{language === 'vi' ? 'Tổng câu' : 'Total'}</Text>
               </View>
-            </View>
+            </Animated.View>
+          </View>
 
-            {/* Difficulty Badge */}
-            <View style={styles.difficultyBadge}>
-              <Text style={styles.difficultyText}>
-                {config.emoji} {getDifficultyName()}
+          {/* ── Action Buttons ── */}
+          <Animated.View style={[styles.actionButtons, { transform: [{ translateY: btnAnim }] }]}>
+            <TouchableOpacity style={styles.primaryButton} onPress={continueAfterFail} activeOpacity={0.8}>
+              <LinearGradient colors={GRADIENTS.danger} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                <Text style={styles.btnText}>
+                  {language === 'vi' ? 'Thử lại' : 'Try Again'}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.secondaryButton} onPress={goHome} activeOpacity={0.8}>
+              <Text style={[styles.btnText, { color: COLORS.textSecondary }]}>
+                {t('home')}
               </Text>
-            </View>
+            </TouchableOpacity>
           </Animated.View>
 
-          {/* Details Toggle */}
+          {/* ── Details at very bottom ── */}
           <TouchableOpacity
             style={styles.detailsToggle}
             onPress={() => setShowDetails(!showDetails)}
             activeOpacity={0.7}
           >
-            <LinearGradient
-              colors={[COLORS.surface, COLORS.backgroundCard]}
-              style={styles.detailsToggleInner}
-            >
-              <Text style={styles.detailsToggleText}>
-                {showDetails ? `▲ ${t('hideDetails')}` : `▼ ${t('details')}`}
-              </Text>
-            </LinearGradient>
+            <Text style={styles.detailsToggleText}>
+              {showDetails ? `▲ ${t('hideDetails')}` : `▼ ${t('details')}`}
+            </Text>
           </TouchableOpacity>
 
-          {/* Details List */}
           {showDetails && (
             <View style={styles.detailsList}>
               {gameResults.map((result, index) => (
@@ -299,18 +327,11 @@ const ResultScreen = ({ route, navigation }) => {
                     <Text style={styles.detailQuestion}>{result.question}</Text>
                   </View>
                   <View style={styles.detailRight}>
-                    <Text
-                      style={[
-                        styles.detailIcon,
-                        { color: result.correct ? COLORS.correct : COLORS.wrong },
-                      ]}
-                    >
+                    <Text style={[styles.detailIcon, { color: result.correct ? COLORS.correct : COLORS.wrong }]}>
                       {result.correct ? '✓' : '✗'}
                     </Text>
                     {!result.correct && (
-                      <Text style={styles.correctAnswerSmall}>
-                        = {result.correctAnswer}
-                      </Text>
+                      <Text style={styles.correctAnswerSmall}>= {result.correctAnswer}</Text>
                     )}
                   </View>
                 </View>
@@ -318,59 +339,7 @@ const ResultScreen = ({ route, navigation }) => {
             </View>
           )}
 
-          {/* Action Buttons */}
-          <View style={styles.actionButtons}>
-            <TouchableOpacity
-              style={styles.primaryButton}
-              onPress={playAgain}
-              activeOpacity={0.8}
-            >
-              <LinearGradient
-                colors={GRADIENTS.primary}
-                style={styles.buttonGradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-              >
-                <Text style={styles.primaryButtonText}>🔄 {t('playAgain').toUpperCase()}</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.secondaryButton}
-              onPress={goHome}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.secondaryButtonText}>🏠 {t('home')}</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Tips */}
-          <View style={styles.tipsContainer}>
-            {accuracy < 70 && (
-              <View style={styles.tipCard}>
-                <Text style={styles.tipIcon}>💡</Text>
-                <Text style={styles.tipText}>
-                  {language === 'vi' ? 'Thử mức độ dễ hơn để luyện tập nhé!' : 'Try an easier level to practice!'}
-                </Text>
-              </View>
-            )}
-            {accuracy >= 90 && accuracy < 100 && (
-              <View style={styles.tipCard}>
-                <Text style={styles.tipIcon}>💪</Text>
-                <Text style={styles.tipText}>
-                  {language === 'vi' ? 'Tuyệt vời! Thử mức khó hơn nhé!' : 'Great! Try a harder level!'}
-                </Text>
-              </View>
-            )}
-            {accuracy === 100 && (
-              <View style={styles.tipCard}>
-                <Text style={styles.tipIcon}>🌟</Text>
-                <Text style={styles.tipText}>
-                  {language === 'vi' ? 'Hoàn hảo! Bạn là thiên tài toán học!' : 'Perfect! You are a math genius!'}
-                </Text>
-              </View>
-            )}
-          </View>
+          </Animated.View>
         </ScrollView>
 
         {/* Banner Ad */}
@@ -390,111 +359,33 @@ const styles = StyleSheet.create({
   backgroundGradient: {
     flex: 1,
   },
-  decorCircle1: {
-    position: 'absolute',
-    top: -50,
-    right: -50,
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: COLORS.primary,
-    opacity: 0.1,
-  },
-  decorCircle2: {
-    position: 'absolute',
-    bottom: 100,
-    left: -30,
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: COLORS.secondary,
-    opacity: 0.1,
-  },
-  decorCircle3: {
-    position: 'absolute',
-    top: 200,
-    left: 50,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: COLORS.accent,
-    opacity: 0.1,
-  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 40,
-  },
-  rankSection: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  rankCard: {
-    width: 160,
-    height: 160,
-    borderRadius: 80,
+    flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingVertical: 32,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.4,
-    shadowRadius: 20,
-    elevation: 15,
+    maxWidth: 560,
+    alignSelf: 'center',
+    width: '100%',
   },
-  rankGlow: {
-    position: 'absolute',
-    width: 180,
-    height: 180,
-    borderRadius: 90,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+  newRecordInline: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginBottom: 12,
   },
-  rankEmoji: {
-    fontSize: 50,
-    marginBottom: 5,
-  },
-  rankLabel: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.8)',
-    textTransform: 'uppercase',
-    letterSpacing: 2,
-  },
-  rankValue: {
-    fontSize: 42,
-    fontWeight: 'bold',
-    color: COLORS.white,
-    marginTop: -5,
-  },
-  rankTitle: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.9)',
-    marginTop: 2,
-  },
-  newRecordContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  newRecordBadge: {
-    paddingHorizontal: 25,
-    paddingVertical: 10,
-    borderRadius: 25,
-  },
-  newRecordText: {
+  newRecordInlineText: {
     color: COLORS.black,
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: 'bold',
   },
   scoreSection: {
-    marginBottom: 20,
-  },
-  mainScoreCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 20,
-    padding: 25,
     alignItems: 'center',
-    marginBottom: 15,
+    width: '100%',
   },
   scoreLabel: {
     fontSize: 14,
@@ -506,54 +397,65 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: COLORS.accentYellow,
   },
-  accuracyBar: {
+  barRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    marginTop: 14,
+    marginBottom: 6,
+  },
+  barLabel: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    fontWeight: '600',
+  },
+  barValue: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    fontWeight: 'bold',
+  },
+  trackBar: {
     width: '100%',
     height: 8,
     backgroundColor: COLORS.backgroundCard,
     borderRadius: 4,
-    marginTop: 15,
     overflow: 'hidden',
   },
-  accuracyFill: {
+  trackFill: {
     height: '100%',
     borderRadius: 4,
   },
-  accuracyText: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    marginTop: 8,
+  realmSub: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    marginTop: 6,
+    alignSelf: 'flex-end',
   },
   statsGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 20,
+    width: '100%',
   },
   statBox: {
     flex: 1,
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  statDivider: {
+    width: 1,
+    height: 32,
     backgroundColor: COLORS.surface,
-    borderRadius: 15,
-    padding: 15,
-    alignItems: 'center',
-    marginHorizontal: 5,
-  },
-  statIconBg: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  statIcon: {
-    fontSize: 18,
-    color: COLORS.white,
   },
   statNumber: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: 'bold',
     color: COLORS.text,
   },
   statLabel2: {
-    fontSize: 12,
+    fontSize: 11,
     color: COLORS.textMuted,
     marginTop: 2,
   },
@@ -571,18 +473,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   detailsToggle: {
-    marginBottom: 15,
-  },
-  detailsToggleInner: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
+    marginTop: 14,
+    marginBottom: 10,
     alignItems: 'center',
+    paddingVertical: 8,
   },
   detailsToggleText: {
-    fontSize: 14,
-    color: COLORS.primary,
-    fontWeight: '600',
+    fontSize: 13,
+    color: COLORS.textMuted,
+    fontWeight: '500',
+    letterSpacing: 0.3,
   },
   detailsList: {
     marginBottom: 20,
@@ -624,34 +524,82 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     marginTop: 2,
   },
-  actionButtons: {
-    marginTop: 10,
-  },
-  primaryButton: {
+  failCard: {
+    backgroundColor: 'rgba(255, 107, 107, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 107, 0.4)',
     borderRadius: 16,
-    overflow: 'hidden',
-    marginBottom: 12,
-  },
-  buttonGradient: {
-    paddingVertical: 18,
+    padding: 16,
+    marginBottom: 16,
     alignItems: 'center',
   },
-  primaryButtonText: {
-    color: COLORS.white,
+  failTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FF6B6B',
+    marginBottom: 6,
+  },
+  failSub: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    marginBottom: 10,
+  },
+  failPenalties: {
+    gap: 4,
+    alignItems: 'flex-start',
+  },
+  failPenaltyItem: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+  },
+  nextRoundCard: {
+    backgroundColor: 'rgba(108, 99, 255, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(108, 99, 255, 0.4)',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  nextRoundTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    letterSpacing: 1,
+    color: COLORS.primary,
+    marginBottom: 6,
+  },
+  nextRoundSub: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    marginBottom: 10,
+  },
+  nextRoundItem: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    marginBottom: 2,
+  },
+  actionButtons: {
+    marginTop: 24,
+    gap: 10,
+  },
+  primaryButton: {
+    borderRadius: 18,
+    overflow: 'hidden',
+  },
+  buttonGradient: {
+    paddingVertical: 17,
+    alignItems: 'center',
   },
   secondaryButton: {
     backgroundColor: COLORS.surface,
-    paddingVertical: 16,
-    borderRadius: 16,
+    paddingVertical: 17,
+    borderRadius: 18,
     alignItems: 'center',
   },
-  secondaryButtonText: {
-    color: COLORS.textSecondary,
-    fontSize: 16,
-    fontWeight: '600',
+  btnText: {
+    color: COLORS.white,
+    fontSize: 17,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   tipsContainer: {
     marginTop: 20,

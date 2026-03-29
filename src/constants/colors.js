@@ -72,11 +72,11 @@ export const GRADIENTS = {
   success: ['#00E676', '#00C853'],
   danger: ['#FF5252', '#D32F2F'],
 
-  // Difficulty gradients
-  easy: ['#00E676', '#00C853'],
-  medium: ['#FFD600', '#FFC107'],
-  hard: ['#FF9100', '#FF6D00'],
-  expert: ['#FF5252', '#D32F2F'],
+  // Difficulty gradients — space theme
+  easy:   ['#006D7A', '#00ACC1'],
+  medium: ['#2E27A0', '#4F46E5'],
+  hard:   ['#5B21B6', '#7C3AED'],
+  expert: ['#9D174D', '#BE185D'],
   universe: ['#0a0014', '#1a0033', '#2d0052'],
   universeGlow: ['#8B5CF6', '#A855F7', '#C084FC'],
 };
