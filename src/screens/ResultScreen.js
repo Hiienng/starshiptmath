@@ -14,55 +14,61 @@ import {
 
 const { width: SW, height: SH } = Dimensions.get('window');
 
-const CONFETTI_COLORS = ['#FFD700', '#FF6B6B', '#4ECDC4', '#6C63FF', '#FF6B9D', '#00E5FF', '#FF4DB8'];
+const CONFETTI_COLORS = ['#FFD700', '#FF6B6B', '#4ECDC4', '#6C63FF', '#FF6B9D', '#00E5FF', '#FF4DB8', '#FFFFFF'];
 
-const PARTICLES = Array.from({ length: 22 }, (_, i) => ({
+// More particles, spread from center outward in 2 waves
+const PARTICLES = Array.from({ length: 40 }, (_, i) => ({
   id: i,
   color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
-  size: 6 + (i % 4) * 3,
-  startX: SW * 0.1 + (i / 22) * SW * 0.8,
-  angle: (i / 22) * Math.PI * 2,
-  radius: 80 + (i % 5) * 40,
-  delay: (i % 6) * 80,
+  size: 5 + (i % 5) * 3,
+  startX: SW * 0.5,                               // all launch from center
+  startY: SH * 0.38,
+  angle: (i / 40) * Math.PI * 2,
+  radius: 60 + (i % 3) * 60,                      // spread distance
+  fallDist: SH * 0.45 + (i % 4) * 60,
+  delay: i < 20 ? (i % 5) * 40 : 180 + (i % 5) * 40, // 2 waves
+  dur: 1400 + (i % 4) * 200,
 }));
 
-const ConfettiParticle = ({ color, size, startX, angle, radius, delay }) => {
+const ConfettiParticle = ({ color, size, startX, startY, angle, radius, fallDist, delay, dur }) => {
   const y     = useRef(new Animated.Value(0)).current;
   const x     = useRef(new Animated.Value(0)).current;
   const alpha = useRef(new Animated.Value(0)).current;
   const rot   = useRef(new Animated.Value(0)).current;
+  const scale = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const dx = Math.cos(angle) * radius;
     setTimeout(() => {
       Animated.parallel([
-        Animated.timing(alpha, { toValue: 1, duration: 120, useNativeDriver: true }),
-        Animated.timing(x, { toValue: dx, duration: 700, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-        Animated.timing(y, { toValue: SH * 0.55, duration: 1600, easing: Easing.in(Easing.quad), useNativeDriver: true }),
-        Animated.timing(rot, { toValue: 1, duration: 1600, useNativeDriver: true }),
+        Animated.spring(scale,  { toValue: 1, friction: 4, tension: 120, useNativeDriver: true }),
+        Animated.timing(alpha,  { toValue: 1, duration: 80, useNativeDriver: true }),
+        Animated.timing(x,      { toValue: dx, duration: dur * 0.45, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        Animated.timing(y,      { toValue: fallDist, duration: dur, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+        Animated.timing(rot,    { toValue: 1, duration: dur, useNativeDriver: true }),
         Animated.sequence([
-          Animated.delay(600),
-          Animated.timing(alpha, { toValue: 0, duration: 700, useNativeDriver: true }),
+          Animated.delay(dur * 0.55),
+          Animated.timing(alpha, { toValue: 0, duration: dur * 0.35, useNativeDriver: true }),
         ]),
       ]).start();
     }, delay);
   }, []);
 
-  const rotate = rot.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '540deg'] });
+  const rotate = rot.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '720deg'] });
 
   return (
     <Animated.View
       pointerEvents="none"
       style={{
         position: 'absolute',
-        left: startX,
-        top: SH * 0.12,
+        left: startX - size / 2,
+        top: startY,
         width: size,
         height: size,
         borderRadius: size / 3,
         backgroundColor: color,
         opacity: alpha,
-        transform: [{ translateX: x }, { translateY: y }, { rotate }],
+        transform: [{ translateX: x }, { translateY: y }, { rotate }, { scale }],
         zIndex: 999,
       }}
     />
@@ -75,7 +81,10 @@ import { DIFFICULTY_CONFIG } from '../utils/mathGenerator';
 import { saveHighScore, getHighScoreByDifficulty } from '../utils/storage';
 import { useLanguage } from '../context/LanguageContext';
 import { playSound } from '../utils/soundManager';
-import useInterstitialAd from '../hooks/useInterstitialAd';
+import { useAd } from '../context/AdContext';
+import { addCoin, getCoins, spendCoins } from '../utils/itemStorage';
+import { getHighestUnlockedStage } from '../utils/progressStorage';
+import { DECIMAL_STAGES, DECIMAL_STAGE_CONFIG } from '../utils/decimalGenerator';
 import AdBanner from '../components/AdBanner';
 
 
@@ -88,10 +97,18 @@ const ResultScreen = ({ route, navigation }) => {
     nextTimeMultiplier = 1,
     nextOperandMultiplier = 1,
     mustWatchAd = false,
+    stageCompleted = false,
+    stageId = null,
+    customConfig = null,
+    isStageMode = false,
   } = route.params;
-  const config = DIFFICULTY_CONFIG[difficulty];
-  const { t, language } = useLanguage();
-  const { showAd } = useInterstitialAd();
+  const config = customConfig ?? DIFFICULTY_CONFIG[difficulty] ?? { questionsCount: 7 };
+  const { t } = useLanguage();
+  const { showRewarded, isRewardedReady } = useAd();
+  const [watchingAd, setWatchingAd] = useState(false);
+  const [walletCoins, setWalletCoins] = useState(0);
+  const nextStageId = stageId ? stageId + 1 : null;
+  const nextStageInfo = nextStageId ? DECIMAL_STAGES.find(s => s.id === nextStageId) : null;
 
   const [isNewRecord, setIsNewRecord] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
@@ -103,43 +120,66 @@ const ResultScreen = ({ route, navigation }) => {
 
   // Animations
   const fadeAnim   = useRef(new Animated.Value(0)).current;
-  const slideAnim  = useRef(new Animated.Value(60)).current;
-  const scaleAnim  = useRef(new Animated.Value(0.82)).current;
-  const scoreScale = useRef(new Animated.Value(0.4)).current;
+  const slideAnim  = useRef(new Animated.Value(SH * 0.22)).current;
+  const scaleAnim  = useRef(new Animated.Value(0.6)).current;
+  const scoreScale = useRef(new Animated.Value(0)).current;
   const bar1Anim   = useRef(new Animated.Value(0)).current;
   const bar2Anim   = useRef(new Animated.Value(0)).current;
   const statsAnim  = useRef(new Animated.Value(0)).current;
-  const btnAnim    = useRef(new Animated.Value(40)).current;
+  const btnAnim    = useRef(new Animated.Value(80)).current;
+  const glowAnim   = useRef(new Animated.Value(0)).current;
+  const flashAnim  = useRef(new Animated.Value(0)).current; // white flash on entry
 
   const accuracy = (correctCount / totalQuestions) * 100;
 
   useEffect(() => {
     checkHighScore();
-    if (Platform.OS !== 'web') showAd(mustWatchAd);
+    if (failed) getCoins().then(setWalletCoins);
 
-    // Staggered entrance
+    // ── Cinematic entrance ──────────────────────────────────────
+    // 0. White flash (instant impact)
     Animated.sequence([
+      Animated.timing(flashAnim, { toValue: 0.35, duration: 80, useNativeDriver: true }),
+      Animated.timing(flashAnim, { toValue: 0,    duration: 260, useNativeDriver: true }),
+    ]).start();
+
+    Animated.sequence([
+      // 1. Card slams up from bottom — hard spring overshoot
       Animated.parallel([
-        Animated.timing(fadeAnim,  { toValue: 1, duration: 400, useNativeDriver: true }),
-        Animated.spring(scaleAnim, { toValue: 1, friction: 6, tension: 80, useNativeDriver: true }),
-        Animated.timing(slideAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
+        Animated.timing(fadeAnim,  { toValue: 1, duration: 200, useNativeDriver: true }),
+        Animated.spring(scaleAnim, { toValue: 1, friction: 4, tension: 160, useNativeDriver: true }),
+        Animated.spring(slideAnim, { toValue: 0, friction: 5, tension: 140, useNativeDriver: true }),
       ]),
-      Animated.spring(scoreScale, { toValue: 1, friction: 4, tension: 70, useNativeDriver: true }),
-      Animated.parallel([
-        Animated.timing(bar1Anim, { toValue: 1, duration: 500, useNativeDriver: false }),
-        Animated.timing(bar2Anim, { toValue: 1, duration: 600, delay: 120, useNativeDriver: false }),
+      // 2. Score slams in with huge bounce
+      Animated.spring(scoreScale, { toValue: 1, friction: 2.5, tension: 180, useNativeDriver: true }),
+      // 3. Double glow flash
+      Animated.sequence([
+        Animated.timing(glowAnim, { toValue: 1,   duration: 160, useNativeDriver: true }),
+        Animated.timing(glowAnim, { toValue: 0.3, duration: 120, useNativeDriver: true }),
+        Animated.timing(glowAnim, { toValue: 1,   duration: 140, useNativeDriver: true }),
+        Animated.timing(glowAnim, { toValue: 0.6, duration: 200, useNativeDriver: true }),
       ]),
+      // 4. Bars sweep fast
       Animated.parallel([
-        Animated.spring(statsAnim, { toValue: 1, friction: 5, tension: 60, useNativeDriver: true }),
-        Animated.timing(btnAnim,   { toValue: 0, duration: 300, useNativeDriver: true }),
+        Animated.timing(bar1Anim, { toValue: 1, duration: 420, easing: Easing.out(Easing.cubic), useNativeDriver: false }),
+        Animated.timing(bar2Anim, { toValue: 1, duration: 500, delay: 80, easing: Easing.out(Easing.cubic), useNativeDriver: false }),
+      ]),
+      // 5. Stats + buttons spring up
+      Animated.parallel([
+        Animated.spring(statsAnim, { toValue: 1, friction: 4, tension: 100, useNativeDriver: true }),
+        Animated.spring(btnAnim,   { toValue: 0, friction: 5, tension: 100, useNativeDriver: true }),
       ]),
     ]).start();
 
     if (failed) {
       playSound('wrong');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } else {
       playSound('complete');
-      if (accuracy >= 70) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      // Triple haptic punch for impact
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), 120);
+      setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium), 260);
     }
   }, []);
 
@@ -170,29 +210,67 @@ const ResultScreen = ({ route, navigation }) => {
     }
   };
 
-  const continueAfterFail = () => {
+  const continueAfterFail = (skipInGameRevive = false) => {
     playSound('tap');
     navigation.replace('Game', {
       difficulty,
       totalFails,
       timeMultiplier: nextTimeMultiplier,
       operandMultiplier: nextOperandMultiplier,
+      skipInGameRevive,
+      ...(isStageMode && stageId ? { stageId, customConfig, isStageMode: true } : {}),
     });
+  };
+
+  const handleSpendCoinsContinue = async () => {
+    const ok = await spendCoins(5);
+    if (!ok) return;
+    continueAfterFail(true); // skipInGameRevive=true → forces next fail to result screen
+  };
+
+  const handleWatchAdContinue = () => {
+    if (watchingAd || !isRewardedReady) return;
+    setWatchingAd(true);
+    showRewarded(
+      async () => {
+        await addCoin(10);
+        continueAfterFail(true); // skipInGameRevive=true after ad continue too
+      },
+      () => setWatchingAd(false),
+    );
   };
 
   const goHome = () => {
     playSound('tap');
-    navigation.navigate('Home');
+    if (stageCompleted) {
+      navigation.navigate('DecimalMap');
+    } else {
+      navigation.navigate('Home');
+    }
+  };
+
+  const goNextStage = () => {
+    if (!nextStageInfo) { navigation.navigate('DecimalMap'); return; }
+    playSound('tap');
+    navigation.replace('Game', {
+      difficulty: 'decimal',
+      stageId: nextStageId,
+      customConfig: DECIMAL_STAGE_CONFIG(nextStageId),
+      totalFails: 0,
+      timeMultiplier: 1,
+      operandMultiplier: 1,
+      isStageMode: true,
+    });
   };
 
   const getRealmInfo = (pct) => {
-    if (pct >= 95) return { name: 'Thiên Đạo',  emoji: '🌌', color: '#FFD700' };
-    if (pct >= 80) return { name: 'Nguyên Anh', emoji: '👑', color: '#CC44FF' };
-    if (pct >= 65) return { name: 'Kim Đan',    emoji: '💎', color: '#0099FF' };
-    if (pct >= 50) return { name: 'Trúc Cơ',   emoji: '🔥', color: '#FF6600' };
-    if (pct >= 30) return { name: 'Luyện Khí',  emoji: '⚡', color: '#00CC88' };
-    if (pct >= 15) return { name: 'Nhập Môn',   emoji: '⭐', color: '#AABBCC' };
-    return           { name: 'Thường Nhân', emoji: '🌱', color: '#778899' };
+    if (pct >= 95) return { name: 'Celestial',   emoji: '🌌', color: '#FFD700' };
+    if (pct >= 80) return { name: 'Primordial',  emoji: '👑', color: '#CC44FF' };
+    if (pct >= 65) return { name: 'Golden Core', emoji: '💎', color: '#0099FF' };
+    if (pct >= 50) return { name: 'Foundation',  emoji: '🔥', color: '#FF6600' };
+    if (pct >= 30) return { name: 'Qi Training', emoji: '⚡', color: '#00CC88' };
+    if (pct >= 15) return { name: 'Beginner',    emoji: '⭐', color: '#AABBCC' };
+    return           { name: 'Mortal',      emoji: '🌱', color: '#778899' };
   };
 
   const realmPct = Math.min(100, Math.round((highScore / MAX_REALM_SCORE) * 100));
@@ -206,6 +284,14 @@ const ResultScreen = ({ route, navigation }) => {
         colors={[COLORS.background, COLORS.backgroundLight]}
         style={styles.backgroundGradient}
       >
+        {/* White flash on entry */}
+        <Animated.View pointerEvents="none" style={{
+          ...StyleSheet.absoluteFillObject,
+          backgroundColor: '#ffffff',
+          opacity: flashAnim,
+          zIndex: 9998,
+        }} />
+
         {/* Celebration particles */}
         {PARTICLES.map(p => <ConfettiParticle key={p.id} {...p} />)}
 
@@ -229,7 +315,10 @@ const ResultScreen = ({ route, navigation }) => {
             )}
 
             <Text style={styles.scoreLabel}>{t('totalScore')}</Text>
-            <Animated.Text style={[styles.mainScore, { transform: [{ scale: scoreScale }] }]}>
+            <Animated.Text style={[styles.mainScore, {
+              transform: [{ scale: scoreScale }],
+              opacity: glowAnim.interpolate({ inputRange: [0.4, 1], outputRange: [0.85, 1] }),
+            }]}>
               {displayScore}
             </Animated.Text>
 
@@ -245,9 +334,7 @@ const ResultScreen = ({ route, navigation }) => {
             </View>
 
             <View style={[styles.barRow, { marginTop: 14 }]}>
-              <Text style={styles.barLabel}>
-                {language === 'vi' ? 'Độ nhanh' : 'Speed'}
-              </Text>
+              <Text style={styles.barLabel}>Speed</Text>
               <Text style={[styles.barValue, { color: realmInfo.color }]}>{realmPct}%</Text>
             </View>
             <View style={styles.trackBar}>
@@ -257,7 +344,7 @@ const ResultScreen = ({ route, navigation }) => {
               }]} />
             </View>
             <Text style={styles.realmSub}>
-              {language === 'vi' ? `Kỷ lục: ${highScore} pts` : `Best: ${highScore} pts`}
+              {`Best: ${highScore} pts`}
             </Text>
 
             <Animated.View style={[styles.statsGrid, {
@@ -271,31 +358,88 @@ const ResultScreen = ({ route, navigation }) => {
               <View style={styles.statDivider} />
               <View style={styles.statBox}>
                 <Text style={[styles.statNumber, { color: COLORS.wrong }]}>{totalQuestions - correctCount}</Text>
-                <Text style={styles.statLabel2}>{language === 'vi' ? 'Sai' : 'Wrong'}</Text>
+                <Text style={styles.statLabel2}>Wrong</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statBox}>
                 <Text style={styles.statNumber}>{totalQuestions}</Text>
-                <Text style={styles.statLabel2}>{language === 'vi' ? 'Tổng câu' : 'Total'}</Text>
+                <Text style={styles.statLabel2}>Total</Text>
               </View>
             </Animated.View>
           </View>
 
           {/* ── Action Buttons ── */}
           <Animated.View style={[styles.actionButtons, { transform: [{ translateY: btnAnim }] }]}>
-            <TouchableOpacity style={styles.primaryButton} onPress={continueAfterFail} activeOpacity={0.8}>
-              <LinearGradient colors={GRADIENTS.danger} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-                <Text style={styles.btnText}>
-                  {language === 'vi' ? 'Thử lại' : 'Try Again'}
-                </Text>
-              </LinearGradient>
-            </TouchableOpacity>
+            {stageCompleted ? (
+              <>
+                {nextStageInfo ? (
+                  <TouchableOpacity style={styles.primaryButton} onPress={goNextStage} activeOpacity={0.8}>
+                    <LinearGradient colors={[nextStageInfo.color + 'cc', nextStageInfo.color]} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                      <Text style={styles.btnText}>
+                        {`Next: Stage ${nextStageInfo.label} — ${nextStageInfo.sectionName}`}
+                      </Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity style={styles.primaryButton} onPress={goHome} activeOpacity={0.8}>
+                    <LinearGradient colors={['#FFD700', '#FF8C00']} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                      <Text style={styles.btnText}>🏆 All stages cleared!</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity style={styles.secondaryButton} onPress={goHome} activeOpacity={0.8}>
+                  <Text style={[styles.btnText, { color: COLORS.textSecondary }]}>
+                    {'← Realm Map'}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            ) : failed ? (
+              <>
+                {walletCoins >= 5 ? (
+                  // Enough coins — spend 5 to retry
+                  <TouchableOpacity style={styles.primaryButton} onPress={handleSpendCoinsContinue} activeOpacity={0.8}>
+                    <LinearGradient colors={['#F59E0B', '#D97706']} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                      <Text style={styles.btnText}>🪙 Use 5 coins — Keep playing</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                ) : (
+                  // Not enough coins — send to store to earn coins
+                  <>
+                    <Text style={styles.earnCoinsHint}>
+                      {`You have ${walletCoins} 🪙 in your wallet.\nWatch an ad to earn 10 coins and keep playing.`}
+                    </Text>
+                    <TouchableOpacity
+                      style={[styles.primaryButton, (!isRewardedReady || watchingAd) && { opacity: 0.45 }]}
+                      onPress={handleWatchAdContinue}
+                      disabled={!isRewardedReady || watchingAd}
+                      activeOpacity={0.8}
+                    >
+                      <LinearGradient colors={['#7C3AED', '#4F46E5']} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                        <Text style={styles.btnText}>
+                          {watchingAd ? 'Loading...' : '▶ Earn coins'}
+                        </Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  </>
+                )}
+              </>
+            ) : (
+              <TouchableOpacity style={styles.primaryButton} onPress={continueAfterFail} activeOpacity={0.8}>
+                <LinearGradient colors={GRADIENTS.danger} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                  <Text style={styles.btnText}>
+                    {'Continue'}
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
 
-            <TouchableOpacity style={styles.secondaryButton} onPress={goHome} activeOpacity={0.8}>
-              <Text style={[styles.btnText, { color: COLORS.textSecondary }]}>
-                {t('home')}
-              </Text>
-            </TouchableOpacity>
+            {!stageCompleted && (
+              <TouchableOpacity style={styles.secondaryButton} onPress={goHome} activeOpacity={0.8}>
+                <Text style={[styles.btnText, { color: COLORS.textSecondary }]}>
+                  {t('home')}
+                </Text>
+              </TouchableOpacity>
+            )}
           </Animated.View>
 
           {/* ── Details at very bottom ── */}
@@ -594,6 +738,17 @@ const styles = StyleSheet.create({
     paddingVertical: 17,
     borderRadius: 18,
     alignItems: 'center',
+  },
+  retryButton: {
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  earnCoinsHint: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.5)',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 12,
   },
   btnText: {
     color: COLORS.white,

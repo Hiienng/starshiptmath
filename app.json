@@ -2,8 +2,8 @@
   "expo": {
     "name": "Starship Math",
     "slug": "startship-math",
-    "version": "1.1.0",
-    "runtimeVersion": "1.1.0",
+    "version": "1.2.3",
+    "runtimeVersion": "1.2.3",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "icon": "./assets/icon.png",
@@ -21,8 +21,7 @@
     },
     "android": {
       "package": "com.starshipmath.app",
-      "versionCode": 7,
-      "targetSdkVersion": 35,
+      "versionCode": 12,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#050510"
@@ -53,9 +52,11 @@
         "react-native-google-mobile-ads",
         {
           "androidAppId": "ca-app-pub-3524383584807120~2277305123",
-          "iosAppId": "ca-app-pub-xxxxxxxxxxxxxxxx~zzzzzzzzzz"
+          "iosAppId": "ca-app-pub-3940256099942544~1458002511"
         }
-      ]
+      ],
+      "expo-font",
+      "expo-localization"
     ],
     "extra": {
       "eas": {

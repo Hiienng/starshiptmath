@@ -7,7 +7,7 @@ export const DIFFICULTY_CONFIG = {
     maxNumber: 10,
     operations: ['+'],
     timePerQuestion: 15,
-    questionsCount: 5,
+    questionsCount: 7,
     color: '#00E5FF',
   },
   medium: {
@@ -17,7 +17,7 @@ export const DIFFICULTY_CONFIG = {
     maxNumber: 100,
     operations: ['+', '-'],
     timePerQuestion: 12,
-    questionsCount: 5,
+    questionsCount: 7,
     color: '#FF4DB8',
   },
   hard: {
@@ -27,7 +27,7 @@ export const DIFFICULTY_CONFIG = {
     maxNumber: 1000,
     operations: ['×'],
     timePerQuestion: 5,
-    questionsCount: 5,
+    questionsCount: 7,
     color: '#FF6D3B',
   },
   expert: {
@@ -37,7 +37,7 @@ export const DIFFICULTY_CONFIG = {
     maxNumber: 1000,
     operations: ['×', '÷'],
     timePerQuestion: 2,
-    questionsCount: 5,
+    questionsCount: 7,
     color: '#AA44FF',
   },
   universe: {
@@ -45,7 +45,7 @@ export const DIFFICULTY_CONFIG = {
     emoji: '🌌',
     description: 'Ultimate Challenge',
     maxNumber: 9999,
-    operations: ['+', '-', '×', '÷'],
+    operations: ['+', '-', '×', '÷', '++'],
     timePerQuestion: 1.5,
     questionsCount: 30,
     color: '#8B5CF6',
@@ -62,7 +62,7 @@ export const generateQuestion = (difficulty, operandMultiplier = 1) => {
   const config = DIFFICULTY_CONFIG[difficulty];
   const operation = config.operations[randomInt(0, config.operations.length - 1)];
 
-  let num1, num2, answer;
+  let num1, num2, num3, answer;
 
   switch (operation) {
     case '+':
@@ -78,13 +78,14 @@ export const generateQuestion = (difficulty, operandMultiplier = 1) => {
       answer = num1 - num2;
       break;
 
-    case '×':
+    case '×': {
       // Giới hạn để kết quả không quá lớn
       const maxMultiplier = Math.min(12, Math.floor(config.maxNumber / 2));
       num1 = randomInt(2, maxMultiplier * operandMultiplier);
       num2 = randomInt(2, maxMultiplier);
       answer = num1 * num2;
       break;
+    }
 
     case '÷':
       // Đảm bảo kết quả là số nguyên
@@ -92,6 +93,16 @@ export const generateQuestion = (difficulty, operandMultiplier = 1) => {
       answer = randomInt(1, 12);
       num1 = num2 * answer;
       break;
+
+    case '++': {
+      // 2 phép cộng chập: a + b + c
+      const cap = Math.min(999, config.maxNumber * operandMultiplier);
+      num1 = randomInt(1, cap);
+      num2 = randomInt(1, cap);
+      num3 = randomInt(1, cap);
+      answer = num1 + num2 + num3;
+      break;
+    }
 
     default:
       num1 = randomInt(1, config.maxNumber) * operandMultiplier;
@@ -105,13 +116,18 @@ export const generateQuestion = (difficulty, operandMultiplier = 1) => {
   // Trộn đáp án
   const allAnswers = shuffleArray([answer, ...wrongAnswers]);
 
+  const questionText = operation === '++'
+    ? `${num1} + ${num2} + ${num3} = ?`
+    : `${num1} ${operation} ${num2} = ?`;
+
   return {
     num1,
     num2,
+    num3: num3 ?? null,
     operation,
     answer,
     options: allAnswers,
-    questionText: `${num1} ${operation} ${num2} = ?`,
+    questionText,
   };
 };
 

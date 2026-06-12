@@ -172,13 +172,12 @@ const RoundTransition = ({ visible, fromRound, toRound, newEffectiveTime, onComp
 
       {/* ── Round number reveal ── */}
       <Animated.View style={[styles.centerContent, { opacity: contentAlpha }]}>
-        <Animated.View style={[styles.glowOrb, { transform: [{ scale: glowScale }] }]} />
-
-        <Text style={styles.labelText}>ROUND</Text>
-
-        <Animated.Text style={[styles.roundNum, { transform: [{ scale: numberScale }] }]}>
-          {toRound}
-        </Animated.Text>
+        <Animated.View style={[styles.glowOrb, { transform: [{ scale: glowScale }] }]}>
+          <Text style={styles.labelText}>ROUND</Text>
+          <Animated.Text style={[styles.roundNum, { transform: [{ scale: numberScale }] }]}>
+            {toRound}
+          </Animated.Text>
+        </Animated.View>
       </Animated.View>
 
       {/* ── Starship + rainbow exhaust ── */}
@@ -210,13 +209,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   glowOrb: {
-    position: 'absolute',
     width: 220,
     height: 220,
     borderRadius: 110,
     backgroundColor: 'rgba(100, 30, 220, 0.12)',
     borderWidth: 1,
     borderColor: 'rgba(160, 80, 255, 0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   labelText: {
     fontSize: 12,

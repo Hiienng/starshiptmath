@@ -40,9 +40,12 @@ export const AD_UNIT_IDS = USE_TEST_ADS ? TEST_IDS : PRODUCTION_IDS;
 // Ad display frequency settings
 export const AD_CONFIG = {
   // Show interstitial after every N games
-  INTERSTITIAL_FREQUENCY: 3,
+  INTERSTITIAL_FREQUENCY: 1,
   // Delay before showing interstitial (ms)
   INTERSTITIAL_DELAY: 1000,
+  // Safety net: if this many levels/games pass without any interstitial
+  // being shown, force one on the next level transition.
+  MAX_LEVELS_WITHOUT_AD: 5,
 };
 
 export default {

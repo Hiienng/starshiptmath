@@ -103,13 +103,13 @@ const FloatingObject = memo(({ source, size, startX, duration, initDelay }) => {
   );
 });
 
-// ── Main starship — gentle float left of centre ───────────────────────────
-const SHIP_SIZE = 78;
-const SHIP_X    = SW * 0.03;   // near left edge, behind X button area
-const SHIP_MID  = SH * 0.11;  // high up, near the header
-const SHIP_AMP  = 4;
+// ── Main starship — right side, larger float amplitude ────────────────────
+const SHIP_SIZE = 88;
+const SHIP_X    = SW * 0.78;   // right side
+const SHIP_MID  = SH * 0.14;  // vertically near header
+const SHIP_AMP  = 18;          // larger amplitude
 
-const MainStarship = memo(() => {
+const MainStarship = memo(({ source }) => {
   const shipY = useRef(new Animated.Value(SHIP_MID - SHIP_AMP)).current;
   const alive = useRef(true);
 
@@ -120,13 +120,13 @@ const MainStarship = memo(() => {
       Animated.sequence([
         Animated.timing(shipY, {
           toValue: SHIP_MID + SHIP_AMP,
-          duration: 3200,
+          duration: 2000,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
         Animated.timing(shipY, {
           toValue: SHIP_MID - SHIP_AMP,
-          duration: 3200,
+          duration: 2000,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
@@ -152,7 +152,7 @@ const MainStarship = memo(() => {
       }}
     >
       <Image
-        source={require('../../assets/mainobj.png')}
+        source={source ?? require('../../assets/mainobj.png')}
         style={{ width: SHIP_SIZE, height: SHIP_SIZE }}
         resizeMode="contain"
       />
@@ -161,7 +161,7 @@ const MainStarship = memo(() => {
 });
 
 // ── Exported component ────────────────────────────────────────────────────
-const SpaceBackground = () => (
+const SpaceBackground = ({ shipSource }) => (
   <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
     {STARS.map(s => <WarpStar key={s.id} {...s} />)}
 
@@ -186,7 +186,7 @@ const SpaceBackground = () => (
       size={38} startX={SW * 0.25} duration={14000} initDelay={7000}
     />
 
-    <MainStarship />
+    <MainStarship source={shipSource} />
   </View>
 );
 
