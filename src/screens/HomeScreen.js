@@ -8,6 +8,7 @@ import {
   StatusBar,
   Animated,
   Image,
+  Platform,
   useWindowDimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,6 +21,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FONTS } from '../constants/fonts';
 import MenuButton from '../components/MenuButton';
 import BuyCoinsModal from '../components/BuyCoinsModal';
+import AdBanner from '../components/AdBanner';
 
 const COIN_IMG = require('../../assets/coin.png');
 
@@ -452,6 +454,7 @@ const HomeScreen = ({ navigation }) => {
         </ScrollView>
         </View>
 
+        {Platform.OS !== 'web' && <AdBanner style={styles.adBanner} />}
       </LinearGradient>
     </View>
   );
@@ -834,6 +837,9 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: 'rgba(108, 99, 255, 0.5)',
     letterSpacing: 1,
+  },
+  adBanner: {
+    width: '100%',
   },
 
 });
