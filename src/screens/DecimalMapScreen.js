@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  StatusBar, Animated, useWindowDimensions,
+  StatusBar, Animated, Platform, useWindowDimensions,
 } from 'react-native';
+import AdBanner from '../components/AdBanner';
 import { LinearGradient } from 'expo-linear-gradient';
 import { DECIMAL_STAGES, DECIMAL_STAGE_CONFIG, PYRAMID_ROWS, TOTAL_STAGES } from '../utils/decimalGenerator';
 import { getUnlockedStages } from '../utils/progressStorage';
@@ -237,6 +238,8 @@ const DecimalMapScreen = ({ navigation }) => {
 
           <View style={{ height: 16 }} />
         </ScrollView>
+
+        {Platform.OS !== 'web' && <AdBanner />}
 
         {/* Bottom play button */}
         <View style={[styles.bottomBar, isTablet && { paddingHorizontal: '15%' }]}>
