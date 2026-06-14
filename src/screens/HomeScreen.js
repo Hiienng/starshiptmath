@@ -454,7 +454,9 @@ const HomeScreen = ({ navigation }) => {
         </ScrollView>
         </View>
 
-        {Platform.OS !== 'web' && <AdBanner style={styles.adBanner} />}
+        {Platform.OS !== 'web' && (
+          <AdBanner style={styles.adBanner} />
+        )}
       </LinearGradient>
     </View>
   );
@@ -609,7 +611,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 24,
+    paddingBottom: 80,
   },
   heroFixed: {
     width: '100%',
@@ -839,7 +841,10 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   adBanner: {
-    width: '100%',
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
   },
 
 });
