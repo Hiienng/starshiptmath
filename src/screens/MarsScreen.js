@@ -363,8 +363,10 @@ const MarsScreen = ({ route, navigation }) => {
       <Image source={require('../../assets/star1.png')} style={styles.bgDecor1} resizeMode="contain" pointerEvents="none" />
       <Image source={require('../../assets/star2.png')} style={styles.bgDecor2} resizeMode="contain" pointerEvents="none" />
 
-      {/* Header — X (left) + reset ↺ (right) + centred glow card (row, vertically centred) */}
-      <View style={styles.headerWrap}>
+      {/* Header — X (left) + reset ↺ (right) + centred glow card (row, vertically centred).
+          Constrained to the board's width so its left/right edges line up with the
+          board and the helper buttons below it. */}
+      <View style={[styles.headerWrap, { width: actualBoard, alignSelf: 'center' }]}>
         <TouchableOpacity style={[styles.closeBtn, isTablet && { width: 44 * Math.min(ts, 1.4), height: 44 * Math.min(ts, 1.4), borderRadius: 22 * Math.min(ts, 1.4) }]} onPress={() => navigation.navigate('Home')}>
           <Text style={[styles.closeTxt, isTablet && { fontSize: 18 * Math.min(ts, 1.4) }]}>✕</Text>
         </TouchableOpacity>
@@ -576,7 +578,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 50,
     paddingBottom: 14,
-    paddingHorizontal: 14,
     gap: 12,
   },
   closeBtn: {

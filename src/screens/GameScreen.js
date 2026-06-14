@@ -704,7 +704,7 @@ const GameScreen = ({ route, navigation }) => {
         <SpaceBackground shipSource={activeSkinSource} />
 
           {/* Header — ✕ + centred glow card + pause (row, vertically centred) */}
-        <View style={[styles.headerWrap, isTablet && { paddingHorizontal: 14 + contentSideInset }]}>
+        <View style={[styles.headerWrap, isTablet && { paddingHorizontal: 12 + contentSideInset }]}>
           <TouchableOpacity
             style={[styles.closeBtn, isTablet && { width: 44 * Math.min(ts, 1.4), height: 44 * Math.min(ts, 1.4), borderRadius: 22 * Math.min(ts, 1.4) }]}
             onPress={() => { voluntaryExit.current = true; navigation.goBack(); }}
@@ -982,7 +982,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 50,
     paddingBottom: 14,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     gap: 12,
   },
   closeBtn: {
