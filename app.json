@@ -21,7 +21,7 @@
     },
     "android": {
       "package": "com.starshipmath.app",
-      "versionCode": 15,
+      "versionCode": 16,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#050510"
