@@ -157,8 +157,9 @@ export const AdProvider = ({ children, ageGroup }) => {
     if (Platform.OS === 'web') { advance?.(); return; }
     levelsSinceAdRef.current += 1;
     if (levelsSinceAdRef.current >= AD_CONFIG.MAX_LEVELS_WITHOUT_AD) {
-      const shown = showInterstitial(advance);
-      if (!shown) advance?.();
+      // showInterstitial always calls advance — either after ad closes or
+      // immediately when no ad is ready. Do NOT call advance again here.
+      showInterstitial(advance);
     } else {
       advance?.();
     }
