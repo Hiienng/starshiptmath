@@ -715,29 +715,47 @@ export default function JupiterScreen({ route, navigation }) {
         ))}
       </View>
 
-      {/* HUD top — clean 3-row card, ALWAYS on top, but lets touches pass through */}
-      <View style={[styles.hudCard, W >= 768 && { left: (W - Math.min(W * 0.85, 600)) / 2, right: (W - Math.min(W * 0.85, 600)) / 2 }]} pointerEvents="none">
-        <View style={styles.hudRow}>
-          <Text style={styles.hudLvl}>{cfg.title} · {theme.name}</Text>
-          <View style={styles.hudTimeWrap}>
-            <Text style={styles.hudTime}>{timeLeft}</Text>
-            <Text style={styles.hudTimeUnit}>s</Text>
+      {/* Header — ✕ + HUD card + pause, in one row so the side buttons stay
+          vertically centred with the board. box-none lets falling-tile touches
+          pass through everything except the two buttons. */}
+      <View style={[styles.headerWrap, W >= 768 && { paddingHorizontal: (W - Math.min(W * 0.85, 600)) / 2 }]} pointerEvents="box-none">
+        {/* back */}
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.navigate('Home')}>
+          <Text style={styles.backTxt}>✕</Text>
+        </TouchableOpacity>
+
+        {/* HUD card — 3-row board, lets touches pass through */}
+        <View style={styles.hudCard} pointerEvents="none">
+          <View style={styles.hudRow}>
+            <Text style={styles.hudLvl}>{cfg.title} · {theme.name}</Text>
+            <View style={styles.hudTimeWrap}>
+              <Text style={styles.hudTime}>{timeLeft}</Text>
+              <Text style={styles.hudTimeUnit}>s</Text>
+            </View>
+          </View>
+          <View style={styles.hudScoreRow}>
+            <View style={styles.hudCol}>
+              <Text style={styles.hudLabel}>SCORE</Text>
+              <Text style={styles.hudScore}>{score}</Text>
+            </View>
+            <View style={styles.hudDivider} />
+            <View style={styles.hudCol}>
+              <Text style={styles.hudLabel}>TARGET</Text>
+              <Text style={styles.hudTarget}>{cfg.scoreThreshold}</Text>
+            </View>
+          </View>
+          <View style={styles.progBar}>
+            <View style={[styles.progFill, { width: `${pct * 100}%` }]} />
           </View>
         </View>
-        <View style={styles.hudScoreRow}>
-          <View style={styles.hudCol}>
-            <Text style={styles.hudLabel}>SCORE</Text>
-            <Text style={styles.hudScore}>{score}</Text>
+
+        {/* pause */}
+        <TouchableOpacity style={styles.pauseBtn} onPress={pauseGame}>
+          <View style={styles.pauseBars}>
+            <View style={styles.pauseBar} />
+            <View style={styles.pauseBar} />
           </View>
-          <View style={styles.hudDivider} />
-          <View style={styles.hudCol}>
-            <Text style={styles.hudLabel}>TARGET</Text>
-            <Text style={styles.hudTarget}>{cfg.scoreThreshold}</Text>
-          </View>
-        </View>
-        <View style={styles.progBar}>
-          <View style={[styles.progFill, { width: `${pct * 100}%` }]} />
-        </View>
+        </TouchableOpacity>
       </View>
 
       {/* ship */}
@@ -747,19 +765,6 @@ export default function JupiterScreen({ route, navigation }) {
       }]}>
         <Image source={imgSrc} style={{ width: SHIP_W, height: SHIP_H }} resizeMode="contain" />
       </Animated.View>
-
-      {/* back */}
-      <TouchableOpacity style={styles.backBtn} onPress={() => navigation.navigate('Home')}>
-        <Text style={styles.backTxt}>✕</Text>
-      </TouchableOpacity>
-
-      {/* pause */}
-      <TouchableOpacity style={styles.pauseBtn} onPress={pauseGame}>
-        <View style={styles.pauseBars}>
-          <View style={styles.pauseBar} />
-          <View style={styles.pauseBar} />
-        </View>
-      </TouchableOpacity>
 
       {/* pause overlay */}
       {paused && (
@@ -811,17 +816,25 @@ const styles = StyleSheet.create({
     top: 160, left: 0, right: 0, bottom: 0,
     overflow: 'hidden',
   },
-  hudCard: {
+  headerWrap: {
     position: 'absolute',
-    top: 50, left: 56, right: 56,
+    top: 0, left: 0, right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: 50,
+    paddingHorizontal: 14,
+    gap: 12,
+    zIndex: 100,
+    elevation: 20,
+  },
+  hudCard: {
+    flex: 1,
     backgroundColor: 'rgba(15, 10, 35, 0.92)',
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderWidth: 1,
     borderColor: 'rgba(124, 58, 237, 0.35)',
-    zIndex: 100,
-    elevation: 20,
     shadowColor: '#7C3AED',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
@@ -900,21 +913,21 @@ const styles = StyleSheet.create({
   },
   ship:      { position: 'absolute', left: 0 },
   backBtn: {
-    position: 'absolute', top: 48, left: 14,
-    width: 30, height: 30, borderRadius: 15,
+    width: 42, height: 42, borderRadius: 21,
     backgroundColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center', justifyContent: 'center',
+    zIndex: 110,
   },
-  backTxt:   { color: '#fff', fontSize: 13 },
+  backTxt:   { color: '#fff', fontSize: 17 },
 
   pauseBtn: {
-    position: 'absolute', top: 48, right: 14,
-    width: 30, height: 30, borderRadius: 15,
+    width: 42, height: 42, borderRadius: 21,
     backgroundColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center', justifyContent: 'center',
+    zIndex: 110,
   },
   pauseBars: { flexDirection: 'row', gap: 4 },
-  pauseBar:  { width: 3, height: 12, borderRadius: 1.5, backgroundColor: '#fff' },
+  pauseBar:  { width: 4, height: 15, borderRadius: 2, backgroundColor: '#fff' },
 
   pauseOverlay: {
     ...StyleSheet.absoluteFillObject,

@@ -363,10 +363,10 @@ const MarsScreen = ({ route, navigation }) => {
       <Image source={require('../../assets/star1.png')} style={styles.bgDecor1} resizeMode="contain" pointerEvents="none" />
       <Image source={require('../../assets/star2.png')} style={styles.bgDecor2} resizeMode="contain" pointerEvents="none" />
 
-      {/* Header — floating X (left) + reset ↺ (right) + centred glow card */}
-      <View style={[styles.headerWrap, isTablet && { height: 130 + (ts - 1) * 30 }]}>
-        <TouchableOpacity style={[styles.closeBtn, isTablet && { width: 30 * Math.min(ts, 1.4), height: 30 * Math.min(ts, 1.4), borderRadius: 15 * Math.min(ts, 1.4) }]} onPress={() => navigation.navigate('Home')}>
-          <Text style={[styles.closeTxt, isTablet && { fontSize: 13 * Math.min(ts, 1.4) }]}>✕</Text>
+      {/* Header — X (left) + reset ↺ (right) + centred glow card (row, vertically centred) */}
+      <View style={styles.headerWrap}>
+        <TouchableOpacity style={[styles.closeBtn, isTablet && { width: 44 * Math.min(ts, 1.4), height: 44 * Math.min(ts, 1.4), borderRadius: 22 * Math.min(ts, 1.4) }]} onPress={() => navigation.navigate('Home')}>
+          <Text style={[styles.closeTxt, isTablet && { fontSize: 18 * Math.min(ts, 1.4) }]}>✕</Text>
         </TouchableOpacity>
         <View style={[styles.headerCard, isTablet && { paddingVertical: 12 * Math.min(ts, 1.5), paddingHorizontal: 14 * Math.min(ts, 1.5) }, { borderColor: theme.pathColor + '55', shadowColor: theme.pathGlow }]}>
           <Text style={[styles.title, isTablet && { fontSize: 20 * Math.min(ts, 1.5) }]}>LEVEL {cfg.level}</Text>
@@ -374,8 +374,8 @@ const MarsScreen = ({ route, navigation }) => {
             {theme.name.toUpperCase()} · {Math.min(solvedCount, PUZZLES_TO_ADVANCE)}/{PUZZLES_TO_ADVANCE} SOLVED
           </Text>
         </View>
-        <TouchableOpacity style={[styles.resetBtn, isTablet && { width: 30 * Math.min(ts, 1.4), height: 30 * Math.min(ts, 1.4), borderRadius: 15 * Math.min(ts, 1.4) }]} onPress={reset}>
-          <Text style={[styles.resetTxt, isTablet && { fontSize: 14 * Math.min(ts, 1.4) }]}>↺</Text>
+        <TouchableOpacity style={[styles.resetBtn, isTablet && { width: 44 * Math.min(ts, 1.4), height: 44 * Math.min(ts, 1.4), borderRadius: 22 * Math.min(ts, 1.4) }]} onPress={reset}>
+          <Text style={[styles.resetTxt, isTablet && { fontSize: 19 * Math.min(ts, 1.4) }]}>↺</Text>
         </TouchableOpacity>
       </View>
 
@@ -572,31 +572,29 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
   headerWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingTop: 50,
     paddingBottom: 14,
-    height: 130,
+    paddingHorizontal: 14,
+    gap: 12,
   },
   closeBtn: {
-    position: 'absolute',
-    top: 50, left: 14,
-    width: 30, height: 30, borderRadius: 15,
+    width: 42, height: 42, borderRadius: 21,
     backgroundColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center', justifyContent: 'center',
     zIndex: 10,
   },
-  closeTxt: { color: '#fff', fontSize: 13 },
+  closeTxt: { color: '#fff', fontSize: 17 },
   resetBtn: {
-    position: 'absolute',
-    top: 50, right: 14,
-    width: 30, height: 30, borderRadius: 15,
+    width: 42, height: 42, borderRadius: 21,
     backgroundColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center', justifyContent: 'center',
     zIndex: 10,
   },
-  resetTxt: { color: '#fff', fontSize: 14, fontWeight: '900' },
+  resetTxt: { color: '#fff', fontSize: 18, fontWeight: '900' },
   headerCard: {
-    position: 'absolute',
-    top: 50, left: 56, right: 56,
+    flex: 1,
     backgroundColor: 'rgba(15, 10, 35, 0.92)',
     borderRadius: 14,
     paddingHorizontal: 14,

@@ -703,16 +703,16 @@ const GameScreen = ({ route, navigation }) => {
       >
         <SpaceBackground shipSource={activeSkinSource} />
 
-          {/* Header — floating ✕ + centred glow card + pause */}
-        <View style={[styles.headerWrap, isTablet && { height: 120 + (ts - 1) * 30 }]}>
+          {/* Header — ✕ + centred glow card + pause (row, vertically centred) */}
+        <View style={[styles.headerWrap, isTablet && { paddingHorizontal: 14 + contentSideInset }]}>
           <TouchableOpacity
-            style={[styles.closeBtn, isTablet && { width: 30 * Math.min(ts, 1.4), height: 30 * Math.min(ts, 1.4), borderRadius: 15 * Math.min(ts, 1.4) }]}
+            style={[styles.closeBtn, isTablet && { width: 44 * Math.min(ts, 1.4), height: 44 * Math.min(ts, 1.4), borderRadius: 22 * Math.min(ts, 1.4) }]}
             onPress={() => { voluntaryExit.current = true; navigation.goBack(); }}
           >
-            <Text style={[styles.closeTxt, isTablet && { fontSize: 13 * Math.min(ts, 1.4) }]}>✕</Text>
+            <Text style={[styles.closeTxt, isTablet && { fontSize: 18 * Math.min(ts, 1.4) }]}>✕</Text>
           </TouchableOpacity>
 
-          <View style={[styles.headerCard, isTablet && { paddingVertical: 10 * Math.min(ts, 1.5), paddingHorizontal: 14 * Math.min(ts, 1.5), left: contentSideInset, right: contentSideInset }]}>
+          <View style={[styles.headerCard, isTablet && { paddingVertical: 10 * Math.min(ts, 1.5), paddingHorizontal: 14 * Math.min(ts, 1.5) }]}>
             {/* Progress */}
             <Text style={[styles.headerProgress, isTablet && { fontSize: 15 * Math.min(ts, 1.5) }]}>
               {questionIndex + 1}/{config.questionsCount}
@@ -729,12 +729,12 @@ const GameScreen = ({ route, navigation }) => {
           </View>
 
           <TouchableOpacity
-            style={[styles.pauseBtn, isTablet && { width: 30 * Math.min(ts, 1.4), height: 30 * Math.min(ts, 1.4), borderRadius: 15 * Math.min(ts, 1.4) }]}
+            style={[styles.pauseBtn, isTablet && { width: 44 * Math.min(ts, 1.4), height: 44 * Math.min(ts, 1.4), borderRadius: 22 * Math.min(ts, 1.4) }]}
             onPress={pauseGame}
           >
             <View style={styles.pauseBars}>
-              <View style={[styles.pauseBar, isTablet && { width: 3 * Math.min(ts, 1.4), height: 12 * Math.min(ts, 1.4) }]} />
-              <View style={[styles.pauseBar, isTablet && { width: 3 * Math.min(ts, 1.4), height: 12 * Math.min(ts, 1.4) }]} />
+              <View style={[styles.pauseBar, isTablet && { width: 4 * Math.min(ts, 1.4), height: 16 * Math.min(ts, 1.4) }]} />
+              <View style={[styles.pauseBar, isTablet && { width: 4 * Math.min(ts, 1.4), height: 16 * Math.min(ts, 1.4) }]} />
             </View>
           </TouchableOpacity>
         </View>
@@ -978,29 +978,28 @@ const styles = StyleSheet.create({
   },
   // ── Jupiter-style header ──────────────────────────────────────
   headerWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingTop: 50,
     paddingBottom: 14,
-    height: 120,
+    paddingHorizontal: 14,
+    gap: 12,
   },
   closeBtn: {
-    position: 'absolute',
-    top: 50, left: 14,
-    width: 30, height: 30, borderRadius: 15,
+    width: 42, height: 42, borderRadius: 21,
     backgroundColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center', justifyContent: 'center',
     zIndex: 10,
   },
-  closeTxt: { color: '#fff', fontSize: 13 },
+  closeTxt: { color: '#fff', fontSize: 17 },
   pauseBtn: {
-    position: 'absolute',
-    top: 50, right: 14,
-    width: 30, height: 30, borderRadius: 15,
+    width: 42, height: 42, borderRadius: 21,
     backgroundColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center', justifyContent: 'center',
     zIndex: 10,
   },
   pauseBars: { flexDirection: 'row', gap: 4 },
-  pauseBar:  { width: 3, height: 12, borderRadius: 1.5, backgroundColor: '#fff' },
+  pauseBar:  { width: 4, height: 15, borderRadius: 2, backgroundColor: '#fff' },
   pauseOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.78)',
@@ -1040,8 +1039,7 @@ const styles = StyleSheet.create({
   },
   pauseActionTxt: { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 1 },
   headerCard: {
-    position: 'absolute',
-    top: 50, left: 56, right: 56,
+    flex: 1,
     backgroundColor: 'rgba(15, 10, 35, 0.92)',
     borderRadius: 14,
     paddingHorizontal: 14,
