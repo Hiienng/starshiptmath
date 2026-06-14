@@ -540,6 +540,7 @@ const GameScreen = ({ route, navigation }) => {
     if (paused || isAnswered || !currentQuestion) return;
     if (timerRef.current) clearInterval(timerRef.current);
     progressAnim.stopAnimation();
+    setSkinPickerOpen(false); // always open the pause skin picker collapsed
     setPaused(true);
   };
 
@@ -738,62 +739,7 @@ const GameScreen = ({ route, navigation }) => {
           </TouchableOpacity>
         </View>
 
-        {/* ── Control row: tools left | skin picker right ── */}
-        <View style={styles.controlRow}>
-          <View style={styles.toolRow}>
-            {[
-              { id: 'shield',       img: TOOL_IMGS.shield,       onUse: handleUseShield,       disabled: isAnswered || shieldActive || itemUses.shield <= 0 },
-              { id: 'emergencykit', img: TOOL_IMGS.emergencykit, onUse: handleUseEmergencyKit, disabled: itemUses.emergencykit <= 0 || livesLeft >= MAX_LIVES },
-              { id: 'timeboost',    img: TOOL_IMGS.timeboost,    onUse: handleUseTimeBoost,    disabled: isAnswered || itemUses.timeboost <= 0 },
-            ].map(({ id, img, onUse, disabled }) => (
-              <TouchableOpacity
-                key={id}
-                style={[styles.toolBtn, isTablet && [styles.toolBtnTablet, { width: 52 * Math.min(ts, 1.6), height: 52 * Math.min(ts, 1.6), borderRadius: 14 * Math.min(ts, 1.6) }], disabled && styles.toolBtnDisabled]}
-                onPress={onUse}
-                disabled={disabled}
-                activeOpacity={0.7}
-              >
-                <Image source={img} style={[styles.toolImg, isTablet && [styles.toolImgTablet, { width: 30 * Math.min(ts, 1.6), height: 30 * Math.min(ts, 1.6) }], disabled && { opacity: 0.35 }]} resizeMode="contain" />
-                <View style={[styles.toolBadge, isTablet && styles.toolBadgeTablet]}>
-                  <Text style={[styles.toolBadgeText, isTablet && { fontSize: 13 }]}>{itemUses[id]}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          <View style={{ flex: 1 }} />
-
-          {/* Skin picker button + dropdown */}
-          {ownedSkins.length > 1 && (
-            <View>
-              <TouchableOpacity
-                style={styles.skinPickerBtn}
-                onPress={toggleSkinPicker}
-                activeOpacity={0.8}
-              >
-                <Image source={activeSkinSource ?? SHIP_SKINS[0].image} style={styles.skinPickerThumb} resizeMode="contain" />
-              </TouchableOpacity>
-              {skinPickerOpen && (
-                <Animated.View style={[styles.skinPickerPanel, {
-                  opacity: pickerAnim,
-                  transform: [{ translateX: pickerAnim.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }) }],
-                }]}>
-                  {ownedSkins.map(skin => (
-                    <TouchableOpacity
-                      key={skin.id}
-                      style={[styles.skinPickerItem, skin.id === activeSkinId && styles.skinPickerItemActive]}
-                      onPress={() => handleSelectSkin(skin)}
-                      activeOpacity={0.8}
-                    >
-                      <Image source={skin.image} style={styles.skinPickerImg} resizeMode="contain" />
-                      {skin.id === activeSkinId && <View style={styles.skinPickerDot} />}
-                    </TouchableOpacity>
-                  ))}
-                </Animated.View>
-              )}
-            </View>
-          )}
-        </View>
+        {/* Tools + skin picker moved into the Pause menu (see pause overlay below) */}
 
         {/* ── Body: question centre, answers+stats at bottom ── */}
         <View style={styles.gameBody}>
@@ -935,7 +881,57 @@ const GameScreen = ({ route, navigation }) => {
           <View style={styles.pauseCard}>
             <Text style={styles.pauseTitle}>PAUSED</Text>
             <Text style={styles.pauseSub}>{t('score')}: {fmt(score)}</Text>
-            <View style={{ height: 18 }} />
+
+            {/* ── Tools + skin picker (moved here from the in-game control row) ── */}
+            <View style={styles.pauseToolsRow}>
+              {[
+                { id: 'shield',       img: TOOL_IMGS.shield,       onUse: handleUseShield,       disabled: isAnswered || shieldActive || itemUses.shield <= 0 },
+                { id: 'emergencykit', img: TOOL_IMGS.emergencykit, onUse: handleUseEmergencyKit, disabled: itemUses.emergencykit <= 0 || livesLeft >= MAX_LIVES },
+                { id: 'timeboost',    img: TOOL_IMGS.timeboost,    onUse: handleUseTimeBoost,    disabled: isAnswered || itemUses.timeboost <= 0 },
+              ].map(({ id, img, onUse, disabled }) => (
+                <TouchableOpacity
+                  key={id}
+                  style={[styles.toolBtn, disabled && styles.toolBtnDisabled]}
+                  onPress={onUse}
+                  disabled={disabled}
+                  activeOpacity={0.7}
+                >
+                  <Image source={img} style={[styles.toolImg, disabled && { opacity: 0.35 }]} resizeMode="contain" />
+                  <View style={styles.toolBadge}>
+                    <Text style={styles.toolBadgeText}>{itemUses[id]}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+
+              {/* Skin picker — toggles the inline skin row below */}
+              <TouchableOpacity
+                style={[styles.skinPickerBtn, ownedSkins.length <= 1 && styles.toolBtnDisabled]}
+                onPress={toggleSkinPicker}
+                disabled={ownedSkins.length <= 1}
+                activeOpacity={0.8}
+              >
+                <Image source={activeSkinSource ?? SHIP_SKINS[0].image} style={[styles.skinPickerThumb, ownedSkins.length <= 1 && { opacity: 0.35 }]} resizeMode="contain" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Inline skin choices (shown when the ship button is tapped) */}
+            {skinPickerOpen && ownedSkins.length > 1 && (
+              <View style={styles.pauseSkinRow}>
+                {ownedSkins.map(skin => (
+                  <TouchableOpacity
+                    key={skin.id}
+                    style={[styles.skinPickerItem, skin.id === activeSkinId && styles.skinPickerItemActive]}
+                    onPress={() => handleSelectSkin(skin)}
+                    activeOpacity={0.8}
+                  >
+                    <Image source={skin.image} style={styles.skinPickerImg} resizeMode="contain" />
+                    {skin.id === activeSkinId && <View style={styles.skinPickerDot} />}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            <View style={{ height: 12 }} />
             <TouchableOpacity style={[styles.pauseAction, { backgroundColor: '#7C3AED' }]} onPress={resumeGame}>
               <Text style={styles.pauseActionTxt}>▶  Resume</Text>
             </TouchableOpacity>
@@ -1016,14 +1012,28 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     borderWidth: 1,
     borderColor: 'rgba(124, 58, 237, 0.45)',
-    paddingHorizontal: 28, paddingVertical: 26,
-    width: 260, alignItems: 'center',
+    paddingHorizontal: 18, paddingVertical: 26,
+    width: 300, alignItems: 'center',
     shadowColor: '#7C3AED',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.5, shadowRadius: 16, elevation: 14,
   },
   pauseTitle: { color: '#fff', fontSize: 26, fontWeight: '900', letterSpacing: 4 },
   pauseSub:   { color: 'rgba(184,184,212,0.6)', fontSize: 12, letterSpacing: 1, marginTop: 6 },
+  pauseToolsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 18,
+  },
+  pauseSkinRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 10,
+  },
   pauseAction: {
     width: '100%', borderRadius: 14, paddingVertical: 13, alignItems: 'center',
     marginTop: 10,
