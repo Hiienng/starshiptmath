@@ -39,13 +39,11 @@ export const AD_UNIT_IDS = USE_TEST_ADS ? TEST_IDS : PRODUCTION_IDS;
 
 // Ad display frequency settings
 export const AD_CONFIG = {
-  // Show interstitial after every N games
-  INTERSTITIAL_FREQUENCY: 1,
-  // Delay before showing interstitial (ms)
-  INTERSTITIAL_DELAY: 1000,
-  // Safety net: if this many levels/games pass without any interstitial
-  // being shown, force one on the next level transition.
-  MAX_LEVELS_WITHOUT_AD: 5,
+  // Quick-reaction mode shows an interstitial on every game-over (v1.1.0
+  // behavior). For the level-based modes (Jupiter / Mars / decimal stages) a
+  // skilled player can chain clears without ever hitting a game-over, so force
+  // an interstitial after this many consecutive level clears (no fail).
+  WIN_STREAK_FOR_AD: 4,
 };
 
 export default {

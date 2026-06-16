@@ -218,22 +218,19 @@ let _tid = 0;
 
 export default function JupiterScreen({ route, navigation }) {
   const { level: initLevel = 1 } = route?.params ?? {};
-  const { showInterstitial, recordLevelPlayed } = useAd();
+  const { recordGameOver, recordLevelCleared } = useAd();
   const idx = Math.min(Math.max(initLevel - 1, 0), JUPITER_LEVELS.length - 1);
   const cfg = JUPITER_LEVELS[idx];
 
-  // Show interstitial after every 3 cleared levels (between L3→L4, L6→L7, …)
-  // plus a safety net if AD_CONFIG.MAX_LEVELS_WITHOUT_AD levels pass without
-  // one being shown.
+  // Cleared a level → counts toward the win streak (interstitial every Nth clear).
   const goToNextLevel = () => {
     const nextLevel = initLevel + 1;
-    const shouldShowAd = initLevel % 3 === 0;
-    const advance = () => navigation.replace('Jupiter', { level: nextLevel });
-    if (shouldShowAd) {
-      showInterstitial(advance);
-    } else {
-      recordLevelPlayed(advance);
-    }
+    recordLevelCleared(() => navigation.replace('Jupiter', { level: nextLevel }));
+  };
+
+  // Failed the level → game-over: try an interstitial, then retry the same level.
+  const retryLevel = () => {
+    recordGameOver(() => navigation.replace('Jupiter', { level: initLevel }));
   };
   const numCols = cfg.cols;            // 2 or 3
 
@@ -609,7 +606,7 @@ export default function JupiterScreen({ route, navigation }) {
             </TouchableOpacity>
           )}
           <TouchableOpacity style={[styles.resBtn, { backgroundColor: '#1e293b' }]}
-            onPress={() => navigation.replace('Jupiter', { level: initLevel })}>
+            onPress={retryLevel}>
             <Text style={styles.resBtnTxt}>Retry</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.resBtn, { backgroundColor: '#0f172a', borderWidth: 1, borderColor: '#334155' }]}

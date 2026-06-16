@@ -1,23 +1,19 @@
 import React, { createContext, useContext } from 'react';
 
-const noop = (cb) => { cb?.(); return false; };
-
-const AdContext = createContext({
+const value = {
   isRewardedReady: false,
   showRewarded: (_onRewarded, onClosed) => { onClosed?.(); return false; },
+  ensureRewardedLoaded: () => {},
   showInterstitial: (onClosed) => { onClosed?.(); return false; },
-  recordLevelPlayed: (advance) => advance?.(),
+  recordGameOver: (advance) => advance?.(),
+  recordLevelCleared: (advance) => advance?.(),
   npa: true,
-});
+};
+
+const AdContext = createContext(value);
 
 export const AdProvider = ({ children, ageGroup }) => (
-  <AdContext.Provider value={{
-    isRewardedReady: false,
-    showRewarded: (_onRewarded, onClosed) => { onClosed?.(); return false; },
-    showInterstitial: (onClosed) => { onClosed?.(); return false; },
-    recordLevelPlayed: (advance) => advance?.(),
-    npa: true,
-  }}>
+  <AdContext.Provider value={value}>
     {children}
   </AdContext.Provider>
 );

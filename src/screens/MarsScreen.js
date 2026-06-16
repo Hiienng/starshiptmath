@@ -50,7 +50,7 @@ const dotNumberAt = (cell, dots) => {
 
 const MarsScreen = ({ route, navigation }) => {
   const { level: initLevel = 1 } = route?.params ?? {};
-  const { showInterstitial, recordLevelPlayed } = useAd();
+  const { recordLevelCleared } = useAd();
   const idx = Math.min(Math.max(initLevel - 1, 0), MARS_LEVELS.length - 1);
   const cfg = MARS_LEVELS[idx];
   const theme = themeForLevel(cfg.level);
@@ -70,17 +70,10 @@ const MarsScreen = ({ route, navigation }) => {
   const dots = puzzle.dots;
   const dotCount = dots.length;
 
-  // Show interstitial after every 3 cleared levels (plus a safety net if
-  // AD_CONFIG.MAX_LEVELS_WITHOUT_AD levels pass without one being shown).
+  // Cleared a level → counts toward the win streak (interstitial every Nth clear).
   const goToNextLevel = () => {
     const nextLevel = cfg.level + 1;
-    const shouldShowAd = cfg.level % 3 === 0;
-    const advance = () => navigation.replace('Mars', { level: nextLevel });
-    if (shouldShowAd) {
-      showInterstitial(advance);
-    } else {
-      recordLevelPlayed(advance);
-    }
+    recordLevelCleared(() => navigation.replace('Mars', { level: nextLevel }));
   };
   const { width: SW, height: SH } = useWindowDimensions();
   const isTablet = SW >= 768;

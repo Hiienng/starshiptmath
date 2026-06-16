@@ -15,8 +15,10 @@ const nextBackoff = (attempt) =>
 const AdContext = createContext({
   isRewardedReady: false,
   showRewarded: (onRewarded, onClosed) => false,
+  ensureRewardedLoaded: () => {},
   showInterstitial: (onClosed) => false,
-  recordLevelPlayed: (advance) => advance?.(),
+  recordGameOver: (advance) => advance?.(),
+  recordLevelCleared: (advance) => advance?.(),
   npa: true,
 });
 
@@ -46,6 +48,7 @@ export const AdProvider = ({ children, ageGroup }) => {
   // ── Rewarded ──────────────────────────────────────────────────────────────
   const rewAdRef       = useRef(null);
   const rewLoadedRef   = useRef(false);
+  const rewLoadingRef  = useRef(false); // a load() is in flight — avoid duplicates
   const rewEarnedCbRef = useRef(null); // set just before show(); cleared after fired
   const rewEarnedFired = useRef(false); // guard: callback fires at most once per show
   const rewClosedCbRef = useRef(null);
@@ -53,11 +56,14 @@ export const AdProvider = ({ children, ageGroup }) => {
 
   const loadRewarded = () => {
     if (Platform.OS === 'web') return;
+    if (rewLoadingRef.current) return; // already loading; don't stack requests
+    rewLoadingRef.current = true;
 
     const ad = RewardedAd.createForAdRequest(AD_UNIT_IDS.REWARDED, AD_REQUEST_OPTIONS);
 
     ad.addAdEventListener(RewardedAdEventType.LOADED, () => {
       rewRetryRef.current = 0;
+      rewLoadingRef.current = false;
       rewLoadedRef.current = true;
       setRewardedReady(true);
     });
@@ -84,6 +90,7 @@ export const AdProvider = ({ children, ageGroup }) => {
     });
 
     ad.addAdEventListener(AdEventType.ERROR, (error) => {
+      rewLoadingRef.current = false;
       rewLoadedRef.current = false;
       setRewardedReady(false);
       const delay = nextBackoff(rewRetryRef.current);
@@ -96,15 +103,24 @@ export const AdProvider = ({ children, ageGroup }) => {
     rewAdRef.current = ad;
   };
 
+  // Kick a fresh rewarded load if one isn't ready and isn't already in flight.
+  // Called when the user opens a screen that needs a rewarded ad (e.g. Store),
+  // so they don't have to wait out a long error-backoff before "Earn Coin" works.
+  const ensureRewardedLoaded = () => {
+    if (Platform.OS === 'web') return;
+    if (rewLoadedRef.current || rewLoadingRef.current) return;
+    rewRetryRef.current = 0; // user-initiated: retry immediately
+    loadRewarded();
+  };
+
   // ── Interstitial ──────────────────────────────────────────────────────────
   const intAdRef       = useRef(null);
   const intLoadedRef   = useRef(false);
   const intClosedCbRef = useRef(null);
   const intRetryRef    = useRef(0);
-  // Levels/games played since the last interstitial was actually shown.
-  // Safety net so a mode without its own interstitial schedule (or one whose
-  // schedule keeps missing, e.g. ad not ready) still surfaces ads regularly.
-  const levelsSinceAdRef = useRef(0);
+  // Consecutive level/stage clears with no game-over in between. Drives the
+  // win-streak interstitial for the level-based modes (see recordLevelCleared).
+  const winStreakRef = useRef(0);
 
   const loadInterstitial = () => {
     if (Platform.OS === 'web') return;
@@ -142,23 +158,32 @@ export const AdProvider = ({ children, ageGroup }) => {
       onClosed?.();
       return false;
     }
-    levelsSinceAdRef.current = 0;
+    winStreakRef.current = 0;
     intClosedCbRef.current = onClosed ?? null;
     intAdRef.current.show();
     return true;
   };
 
-  // ── recordLevelPlayed ───────────────────────────────────────────────────
-  // Call after a level/round finishes, right before advancing. Counts levels
-  // played since the last interstitial; once AD_CONFIG.MAX_LEVELS_WITHOUT_AD
-  // is reached, forces an interstitial before calling `advance`. Otherwise
-  // (or if no ad is ready) just calls `advance` immediately.
-  const recordLevelPlayed = (advance) => {
+  // ── recordGameOver ───────────────────────────────────────────────────────
+  // Call when a game/run ENDS (quick-reaction game-over, or a run finishing).
+  // v1.1.0 behavior: try an interstitial on every game. Resets the win streak.
+  // showInterstitial always calls `advance` — after the ad closes, or
+  // immediately when no ad is ready — so never call `advance` again here.
+  const recordGameOver = (advance) => {
     if (Platform.OS === 'web') { advance?.(); return; }
-    levelsSinceAdRef.current += 1;
-    if (levelsSinceAdRef.current >= AD_CONFIG.MAX_LEVELS_WITHOUT_AD) {
-      // showInterstitial always calls advance — either after ad closes or
-      // immediately when no ad is ready. Do NOT call advance again here.
+    winStreakRef.current = 0;
+    showInterstitial(advance);
+  };
+
+  // ── recordLevelCleared ───────────────────────────────────────────────────
+  // Call when a level/stage is CLEARED and we're advancing to the next one.
+  // Counts toward the win streak; every AD_CONFIG.WIN_STREAK_FOR_AD consecutive
+  // clears, force an interstitial. Otherwise advance immediately.
+  const recordLevelCleared = (advance) => {
+    if (Platform.OS === 'web') { advance?.(); return; }
+    winStreakRef.current += 1;
+    if (winStreakRef.current >= AD_CONFIG.WIN_STREAK_FOR_AD) {
+      winStreakRef.current = 0;
       showInterstitial(advance);
     } else {
       advance?.();
@@ -310,8 +335,10 @@ export const AdProvider = ({ children, ageGroup }) => {
     <AdContext.Provider value={{
       isRewardedReady,
       showRewarded,
+      ensureRewardedLoaded,
       showInterstitial,
-      recordLevelPlayed,
+      recordGameOver,
+      recordLevelCleared,
       npa,
     }}>
       {children}

@@ -121,7 +121,7 @@ const GameScreen = ({ route, navigation }) => {
   const config = customConfig ?? DIFFICULTY_CONFIG[difficulty];
   const { t, language } = useLanguage();
   const fmt = (n) => formatInt(n, language);
-  const { showRewarded, isRewardedReady, recordLevelPlayed } = useAd();
+  const { showRewarded, isRewardedReady, recordGameOver, recordLevelCleared } = useAd();
   const [paused, setPaused] = useState(false);
   const [showRevive, setShowRevive] = useState(false);
   const [reviveCoins, setReviveCoins] = useState(0);
@@ -491,7 +491,7 @@ const GameScreen = ({ route, navigation }) => {
       isStageMode,
       stageCompleted: false,
     };
-    recordLevelPlayed(() => navigation.replace('Result', gameOverParams.current));
+    recordGameOver(() => navigation.replace('Result', gameOverParams.current));
   };
 
   const handleGameOver = async () => {
@@ -614,8 +614,8 @@ const GameScreen = ({ route, navigation }) => {
       const nextStageId = stageId + 1;
 
       if (nextStageId > TOTAL_STAGES) {
-        // Final stage cleared — go to Result
-        recordLevelPlayed(() => navigation.replace('Result', {
+        // Final stage cleared — run complete, go to Result
+        recordGameOver(() => navigation.replace('Result', {
           difficulty: 'decimal',
           stageId,
           score,
@@ -635,7 +635,7 @@ const GameScreen = ({ route, navigation }) => {
         // Continue run — carry lives + score into next stage
         reviveUsed.current = false; // allow one revive per stage
         const nextConfig = DECIMAL_STAGE_CONFIG(nextStageId);
-        recordLevelPlayed(() => navigation.replace('Game', {
+        recordLevelCleared(() => navigation.replace('Game', {
           difficulty: 'decimal',
           stageId: nextStageId,
           customConfig: nextConfig,

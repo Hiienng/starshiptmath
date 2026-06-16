@@ -156,7 +156,7 @@ const SkinCard = ({ skin, coins, onBuy, onEquip }) => {
 
 // ── Screen ────────────────────────────────────────────────────
 const StoreScreen = ({ navigation }) => {
-  const { showRewarded, isRewardedReady } = useAd();
+  const { showRewarded, isRewardedReady, ensureRewardedLoaded } = useAd();
   const [items,   setItems]   = useState([]);
   const [skins,   setSkins]   = useState([]);
   const [coins,   setCoins]   = useState(0);
@@ -171,7 +171,13 @@ const StoreScreen = ({ navigation }) => {
 
   useEffect(() => {
     refresh();
-    const unsub = navigation.addListener('focus', refresh);
+    // Kick a fresh rewarded load on entry so "Earn Coin" doesn't sit stuck on
+    // "Ad loading..." while a long error-backoff runs.
+    ensureRewardedLoaded();
+    const unsub = navigation.addListener('focus', () => {
+      refresh();
+      ensureRewardedLoaded();
+    });
     return unsub;
   }, [navigation]);
 
