@@ -264,23 +264,33 @@ const MarsScreen = ({ route, navigation }) => {
   };
 
 
+  // Measure the board's position in the window. measureInWindow returns
+  // window-relative coords, which is what the gesture's page coords (g.x0 /
+  // g.moveX) are too — so they pair up correctly on BOTH iOS and Android. (The
+  // View.measure pageX/pageY used in onLayout is app-root-relative and can be
+  // offset by the status bar / native-stack screen container in a release build,
+  // shifting every touch off the board and breaking the drag.) Re-measured at the
+  // start of every gesture so a stale/wrong layout value can never break drawing.
+  const measureBoard = (cb) => {
+    const node = boardRef.current;
+    if (node && node.measureInWindow) {
+      node.measureInWindow((x, y) => {
+        boardOriginRef.current = { x, y };
+        cb && cb();
+      });
+    } else {
+      cb && cb();
+    }
+  };
+
   const panResponder = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => phase === 'playing',
     onMoveShouldSetPanResponder:  () => phase === 'playing',
     onPanResponderTerminationRequest: () => false,
     onPanResponderGrant: (e, g) => {
-      // On grant, locationX/Y is reliably present and is relative to the responder
-      // view. Cache the offset between locationX (relative) and x0 (page) so we
-      // can recover relative coords during Move events that only have pageX/Y.
-      const ne = e.nativeEvent;
-      if (ne.locationX != null) {
-        // store delta: page = local + delta  →  delta = page - local
-        boardOriginRef.current = {
-          x: g.x0 - ne.locationX,
-          y: g.y0 - ne.locationY,
-        };
-      }
-      tryExtendPath(touchToCell(g.x0, g.y0));
+      // Re-measure the board origin at the start of the gesture, then register
+      // the first touch (dot 1) once the fresh origin is in.
+      measureBoard(() => tryExtendPath(touchToCell(g.x0, g.y0)));
     },
     onPanResponderMove: (e, g) => {
       tryExtendPath(touchToCell(g.moveX, g.moveY));
@@ -390,14 +400,7 @@ const MarsScreen = ({ route, navigation }) => {
           borderWidth: 1,
           borderColor: theme.cellBorder,
         }}
-        onLayout={() => {
-          // Measure absolute page origin so we can convert touch (pageX/Y) → cell
-          if (boardRef.current && boardRef.current.measure) {
-            boardRef.current.measure((x, y, w, h, pageX, pageY) => {
-              boardOriginRef.current = { x: pageX, y: pageY };
-            });
-          }
-        }}
+        onLayout={() => measureBoard()}
         {...panResponder.panHandlers}
       >
         <View style={{ width: innerSize, height: innerSize }}>

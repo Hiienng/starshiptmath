@@ -69,7 +69,7 @@ const WalletCard = ({ coins, onEarn, earning, adReady }) => {
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.walletSub}>1 ad view = 1 coin</Text>
+      <Text style={styles.walletSub}>1 ad view = 10 coins</Text>
     </View>
   );
 };

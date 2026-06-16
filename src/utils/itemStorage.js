@@ -89,6 +89,13 @@ export const SHIP_SKINS = [
     image: require('../../assets/shootingstar.png'),
     price: 25,
   },
+  {
+    id: 'starship3D',
+    nameVi: 'Tàu Plasma',
+    nameEn: 'Plasma Cruiser',
+    image: require('../../assets/starship3D.png'),
+    price: 60, // premium top-tier skin — aspirational coin sink
+  },
 ];
 
 export const getAllSkins = async () => {
@@ -135,7 +142,7 @@ export const STORE_ITEMS = [
     descEn: 'Highlights the correct answer',
     image: require('../../assets/shield.png'),
     color: '#00E5FF',
-    price: 2,
+    price: 20,
   },
   {
     id: 'emergencykit',
@@ -145,7 +152,7 @@ export const STORE_ITEMS = [
     descEn: 'Restore all lives',
     image: require('../../assets/emergencykit.png'),
     color: '#FF6B9D',
-    price: 3,
+    price: 30,
   },
   {
     id: 'timeboost',
@@ -155,7 +162,7 @@ export const STORE_ITEMS = [
     descEn: '+3s per question',
     image: require('../../assets/timeboost.png'),
     color: '#FFD600',
-    price: 1,
+    price: 25,
   },
 ];
 
