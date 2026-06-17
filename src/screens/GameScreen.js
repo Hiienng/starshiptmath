@@ -121,7 +121,7 @@ const GameScreen = ({ route, navigation }) => {
   const config = customConfig ?? DIFFICULTY_CONFIG[difficulty];
   const { t, language } = useLanguage();
   const fmt = (n) => formatInt(n, language);
-  const { showRewarded, isRewardedReady, recordGameOver, recordLevelCleared } = useAd();
+  const { showRewarded, isRewardedReady, recordGameOver, recordLevelCleared, ensureInterstitialLoaded } = useAd();
   const [paused, setPaused] = useState(false);
   const [showRevive, setShowRevive] = useState(false);
   const [reviveCoins, setReviveCoins] = useState(0);
@@ -182,6 +182,9 @@ const GameScreen = ({ route, navigation }) => {
   };
 
   useEffect(() => { refreshItems(); }, []);
+
+  // Make sure an interstitial is loading on entry so it's ready by game-over.
+  useEffect(() => { ensureInterstitialLoaded(); }, []);
 
   const handleUseShield = async () => {
     if (isAnswered || shieldActive || itemUses.shield <= 0) return;

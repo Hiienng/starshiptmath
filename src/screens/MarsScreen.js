@@ -50,7 +50,7 @@ const dotNumberAt = (cell, dots) => {
 
 const MarsScreen = ({ route, navigation }) => {
   const { level: initLevel = 1 } = route?.params ?? {};
-  const { recordLevelCleared } = useAd();
+  const { recordLevelCleared, ensureInterstitialLoaded } = useAd();
   const idx = Math.min(Math.max(initLevel - 1, 0), MARS_LEVELS.length - 1);
   const cfg = MARS_LEVELS[idx];
   const theme = themeForLevel(cfg.level);
@@ -165,6 +165,7 @@ const MarsScreen = ({ route, navigation }) => {
 
   React.useEffect(() => {
     loadSounds();
+    ensureInterstitialLoaded(); // make sure an interstitial is ready for level-clear ads
   }, []);
 
   // Convert absolute page coords → cell on board.

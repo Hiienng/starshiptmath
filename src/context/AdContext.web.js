@@ -5,6 +5,7 @@ const value = {
   showRewarded: (_onRewarded, onClosed) => { onClosed?.(); return false; },
   ensureRewardedLoaded: () => {},
   showInterstitial: (onClosed) => { onClosed?.(); return false; },
+  ensureInterstitialLoaded: () => {},
   recordGameOver: (advance) => advance?.(),
   recordLevelCleared: (advance) => advance?.(),
   npa: true,

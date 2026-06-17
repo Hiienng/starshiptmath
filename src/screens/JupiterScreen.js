@@ -218,7 +218,7 @@ let _tid = 0;
 
 export default function JupiterScreen({ route, navigation }) {
   const { level: initLevel = 1 } = route?.params ?? {};
-  const { recordGameOver, recordLevelCleared } = useAd();
+  const { recordGameOver, recordLevelCleared, ensureInterstitialLoaded } = useAd();
   const idx = Math.min(Math.max(initLevel - 1, 0), JUPITER_LEVELS.length - 1);
   const cfg = JUPITER_LEVELS[idx];
 
@@ -237,6 +237,8 @@ export default function JupiterScreen({ route, navigation }) {
   // layout
   const [layout,   setLayout]   = useState(null);
   const layoutRef  = useRef(null);
+  const rootRef    = useRef(null);
+  const rootOriginX = useRef(0); // root view's X in the window — for tap→column mapping
 
   // game state
   const scoreRef   = useRef(cfg.startsAt ?? 0);
@@ -273,6 +275,7 @@ export default function JupiterScreen({ route, navigation }) {
   // ── skin ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     loadSounds();
+    ensureInterstitialLoaded(); // make sure an interstitial is ready for game-over
     getActiveSkin().then(id => {
       setSkinImg(id && SHIP_SKINS[id]?.image ? SHIP_SKINS[id].image : require('../../assets/mainobj.png'));
     });
@@ -314,7 +317,12 @@ export default function JupiterScreen({ route, navigation }) {
           const next = Math.max(0, Math.min(numCols - 1, shipCol.current + (g.dx > 0 ? 1 : -1)));
           moveShip(next);
         } else {
-          const tapped = Math.floor(e.nativeEvent.locationX / colW);
+          // Use absolute pageX (minus the root's window origin), NOT locationX:
+          // on release, locationX is relative to whatever child view the finger
+          // is over (ship, divider, bg planet…), so a right-side tap can read a
+          // tiny value and snap the ship to column 0. pageX is unambiguous.
+          const tapX = e.nativeEvent.pageX - rootOriginX.current;
+          const tapped = Math.floor(tapX / colW);
           moveShip(Math.max(0, Math.min(numCols - 1, tapped)));
         }
       },
@@ -521,6 +529,10 @@ export default function JupiterScreen({ route, navigation }) {
     const { width, height } = e.nativeEvent.layout;
     layoutRef.current = { width, height };
     setLayout({ width, height });
+    // Cache the root's window X so taps map via absolute pageX (see panResponder).
+    if (rootRef.current?.measureInWindow) {
+      rootRef.current.measureInWindow((x) => { rootOriginX.current = x; });
+    }
     if (started.current) return;
     started.current = true;
 
@@ -630,7 +642,7 @@ export default function JupiterScreen({ route, navigation }) {
   const colW = W / numCols;
 
   return (
-    <View style={styles.root} onLayout={onLayout} {...panResponder.panHandlers}>
+    <View ref={rootRef} style={styles.root} onLayout={onLayout} {...panResponder.panHandlers}>
       <StatusBar hidden />
 
       {/* bg */}

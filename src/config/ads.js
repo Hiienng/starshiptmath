@@ -39,11 +39,12 @@ export const AD_UNIT_IDS = USE_TEST_ADS ? TEST_IDS : PRODUCTION_IDS;
 
 // Ad display frequency settings
 export const AD_CONFIG = {
-  // Quick-reaction mode shows an interstitial on every game-over (v1.1.0
-  // behavior). For the level-based modes (Jupiter / Mars / decimal stages) a
-  // skilled player can chain clears without ever hitting a game-over, so force
-  // an interstitial after this many consecutive level clears (no fail).
-  WIN_STREAK_FOR_AD: 4,
+  // An interstitial is offered on every game-over, and after this many
+  // consecutive level/stage clears with no fail in between.
+  WIN_STREAK_FOR_AD: 2,
+  // When an interstitial is about to show and the player can afford it, they're
+  // offered the choice to spend this many coins to skip the ad instead.
+  AD_SKIP_COST: 9,
 };
 
 export default {

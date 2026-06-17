@@ -1,10 +1,13 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { Platform } from 'react-native';
+import { Platform, View, Text, TouchableOpacity, Modal, StyleSheet, Image } from 'react-native';
 import mobileAds, {
   RewardedAd, RewardedAdEventType, InterstitialAd, AdEventType,
   AdsConsent, AdsConsentStatus, MaxAdContentRating,
 } from 'react-native-google-mobile-ads';
 import { AD_UNIT_IDS, AD_CONFIG } from '../config/ads';
+import { getCoins, spendCoins } from '../utils/itemStorage';
+
+const COIN_IMG = require('../../assets/coin.png');
 
 // ── Exponential backoff: 30s → 60s → 120s → cap at 120s ──────────────────────
 const BACKOFF_BASE_MS  = 30_000;
@@ -17,6 +20,7 @@ const AdContext = createContext({
   showRewarded: (onRewarded, onClosed) => false,
   ensureRewardedLoaded: () => {},
   showInterstitial: (onClosed) => false,
+  ensureInterstitialLoaded: () => {},
   recordGameOver: (advance) => advance?.(),
   recordLevelCleared: (advance) => advance?.(),
   npa: true,
@@ -35,6 +39,10 @@ export const AdProvider = ({ children, ageGroup }) => {
   // NPA = non-personalized ads. Default true (safe). Adult flips to false after UMP allows it.
   // Kids and teens are always NPA per CLAUDE.md §2.3.
   const [npa, setNpa] = useState(true);
+  // When an interstitial is about to show and the player can afford the skip,
+  // we render a modal offering "pay coins to skip" vs "watch ad". Holds the
+  // pending `advance` callback (and the coin balance, for display) while open.
+  const [skipPrompt, setSkipPrompt] = useState(null); // { advance, coins } | null
 
   const AD_REQUEST_OPTIONS = {
     requestNonPersonalizedAdsOnly: npa,
@@ -116,6 +124,7 @@ export const AdProvider = ({ children, ageGroup }) => {
   // ── Interstitial ──────────────────────────────────────────────────────────
   const intAdRef       = useRef(null);
   const intLoadedRef   = useRef(false);
+  const intLoadingRef  = useRef(false); // a load() is in flight — avoid duplicates
   const intClosedCbRef = useRef(null);
   const intRetryRef    = useRef(0);
   // Consecutive level/stage clears with no game-over in between. Drives the
@@ -124,11 +133,14 @@ export const AdProvider = ({ children, ageGroup }) => {
 
   const loadInterstitial = () => {
     if (Platform.OS === 'web') return;
+    if (intLoadingRef.current) return; // already loading; don't stack requests
+    intLoadingRef.current = true;
 
     const ad = InterstitialAd.createForAdRequest(AD_UNIT_IDS.INTERSTITIAL, AD_REQUEST_OPTIONS);
 
     ad.addAdEventListener(AdEventType.LOADED, () => {
       intRetryRef.current = 0;
+      intLoadingRef.current = false;
       intLoadedRef.current = true;
     });
 
@@ -141,6 +153,7 @@ export const AdProvider = ({ children, ageGroup }) => {
     });
 
     ad.addAdEventListener(AdEventType.ERROR, (error) => {
+      intLoadingRef.current = false;
       intLoadedRef.current = false;
       const delay = nextBackoff(intRetryRef.current);
       intRetryRef.current = Math.min(intRetryRef.current + 1, 4);
@@ -152,9 +165,21 @@ export const AdProvider = ({ children, ageGroup }) => {
     intAdRef.current = ad;
   };
 
+  // Kick a fresh interstitial load if one isn't ready and isn't already in
+  // flight. Called when a game screen mounts so interstitials are reliably
+  // loaded even if the one-shot load in the init effect was slow/failed —
+  // mirrors ensureRewardedLoaded (without this, interstitials could never load).
+  const ensureInterstitialLoaded = () => {
+    if (Platform.OS === 'web') return;
+    if (intLoadedRef.current || intLoadingRef.current) return;
+    intRetryRef.current = 0; // entering a game: retry immediately
+    loadInterstitial();
+  };
+
   const showInterstitial = (onClosed) => {
     if (Platform.OS === 'web') { onClosed?.(); return false; }
     if (!intLoadedRef.current || !intAdRef.current) {
+      ensureInterstitialLoaded(); // not ready now — start loading for next time
       onClosed?.();
       return false;
     }
@@ -164,30 +189,64 @@ export const AdProvider = ({ children, ageGroup }) => {
     return true;
   };
 
+  // ── maybeShowInterstitial ─────────────────────────────────────────────────
+  // The single decision point for an "ad moment":
+  //   • no ad ready          → advance now (and kick a load for next time)
+  //   • ad ready + can afford → open the "pay AD_SKIP_COST coins to skip / watch
+  //                             ad" modal; `advance` runs after the user chooses
+  //   • ad ready + can't pay  → show the interstitial (advance after it closes)
+  // Either branch calls `advance` exactly once, so callers never call it again.
+  const maybeShowInterstitial = async (advance) => {
+    if (Platform.OS === 'web') { advance?.(); return; }
+    if (!intLoadedRef.current || !intAdRef.current) {
+      ensureInterstitialLoaded();
+      advance?.();
+      return;
+    }
+    let coins = 0;
+    try { coins = await getCoins(); } catch {}
+    if (coins >= AD_CONFIG.AD_SKIP_COST) {
+      setSkipPrompt({ advance, coins });
+    } else {
+      showInterstitial(advance);
+    }
+  };
+
   // ── recordGameOver ───────────────────────────────────────────────────────
   // Call when a game/run ENDS (quick-reaction game-over, or a run finishing).
-  // v1.1.0 behavior: try an interstitial on every game. Resets the win streak.
-  // showInterstitial always calls `advance` — after the ad closes, or
-  // immediately when no ad is ready — so never call `advance` again here.
+  // Offers an interstitial on every game-over. Resets the win streak.
   const recordGameOver = (advance) => {
     if (Platform.OS === 'web') { advance?.(); return; }
     winStreakRef.current = 0;
-    showInterstitial(advance);
+    maybeShowInterstitial(advance);
   };
 
   // ── recordLevelCleared ───────────────────────────────────────────────────
   // Call when a level/stage is CLEARED and we're advancing to the next one.
   // Counts toward the win streak; every AD_CONFIG.WIN_STREAK_FOR_AD consecutive
-  // clears, force an interstitial. Otherwise advance immediately.
+  // clears, offer an interstitial. Otherwise advance immediately.
   const recordLevelCleared = (advance) => {
     if (Platform.OS === 'web') { advance?.(); return; }
     winStreakRef.current += 1;
     if (winStreakRef.current >= AD_CONFIG.WIN_STREAK_FOR_AD) {
       winStreakRef.current = 0;
-      showInterstitial(advance);
+      maybeShowInterstitial(advance);
     } else {
       advance?.();
     }
+  };
+
+  // Choices for the "skip ad with coins" modal.
+  const onSkipWithCoins = async () => {
+    const advance = skipPrompt?.advance;
+    setSkipPrompt(null);
+    try { await spendCoins(AD_CONFIG.AD_SKIP_COST); } catch {}
+    advance?.();
+  };
+  const onWatchAdInstead = () => {
+    const advance = skipPrompt?.advance;
+    setSkipPrompt(null);
+    showInterstitial(advance);
   };
 
   // ── Startup: initialize SDK immediately ────────────────────────────────────
@@ -337,13 +396,77 @@ export const AdProvider = ({ children, ageGroup }) => {
       showRewarded,
       ensureRewardedLoaded,
       showInterstitial,
+      ensureInterstitialLoaded,
       recordGameOver,
       recordLevelCleared,
       npa,
     }}>
       {children}
+
+      {/* "Pay coins to skip the ad" prompt — shown when an interstitial is ready
+          and the player can afford AD_CONFIG.AD_SKIP_COST. */}
+      <Modal visible={!!skipPrompt} transparent animationType="fade" onRequestClose={onWatchAdInstead}>
+        <View style={adStyles.overlay}>
+          <View style={adStyles.card}>
+            <Text style={adStyles.title}>Skip the ad?</Text>
+            <Text style={adStyles.sub}>Use coins to skip, or watch a quick ad.</Text>
+
+            <View style={adStyles.balanceRow}>
+              <Image source={COIN_IMG} style={adStyles.coinIcon} resizeMode="contain" />
+              <Text style={adStyles.balanceTxt}>{skipPrompt?.coins ?? 0}</Text>
+            </View>
+
+            <TouchableOpacity style={adStyles.payBtn} onPress={onSkipWithCoins} activeOpacity={0.85}>
+              <Image source={COIN_IMG} style={adStyles.payIcon} resizeMode="contain" />
+              <Text style={adStyles.payTxt}>Pay {AD_CONFIG.AD_SKIP_COST} — Skip ad</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={adStyles.watchBtn} onPress={onWatchAdInstead} activeOpacity={0.85}>
+              <Text style={adStyles.watchTxt}>▶  Watch ad</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </AdContext.Provider>
   );
 };
+
+const adStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    alignItems: 'center', justifyContent: 'center',
+    padding: 28,
+  },
+  card: {
+    width: '100%', maxWidth: 320,
+    backgroundColor: '#16172e',
+    borderRadius: 22,
+    paddingHorizontal: 24, paddingVertical: 26,
+    alignItems: 'center',
+    borderWidth: 1, borderColor: 'rgba(124,58,237,0.35)',
+  },
+  title: { fontSize: 22, fontWeight: '900', color: '#fff' },
+  sub: {
+    fontSize: 13, color: 'rgba(255,255,255,0.5)',
+    textAlign: 'center', marginTop: 6,
+  },
+  balanceRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 14, marginBottom: 4 },
+  coinIcon: { width: 20, height: 20 },
+  balanceTxt: { fontSize: 18, fontWeight: '800', color: '#FFD700' },
+  payBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    width: '100%', marginTop: 16,
+    backgroundColor: '#F59E0B', borderRadius: 14, paddingVertical: 13,
+  },
+  payIcon: { width: 18, height: 18 },
+  payTxt: { fontSize: 15, fontWeight: '800', color: '#1a1200' },
+  watchBtn: {
+    width: '100%', marginTop: 10,
+    backgroundColor: '#7C3AED', borderRadius: 14, paddingVertical: 13,
+    alignItems: 'center',
+  },
+  watchTxt: { fontSize: 15, fontWeight: '800', color: '#fff' },
+});
 
 export const useAd = () => useContext(AdContext);
