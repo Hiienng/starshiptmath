@@ -22,7 +22,9 @@ import { FONTS } from '../constants/fonts';
 import MenuButton from '../components/MenuButton';
 import BuyCoinsModal from '../components/BuyCoinsModal';
 import AdBanner from '../components/AdBanner';
+import appConfig from '../../app.json';
 
+const APP_VERSION = appConfig.expo.version; // single source of truth (bumped per release)
 const COIN_IMG = require('../../assets/coin.png');
 
 // Planet images — place these files in assets/
@@ -449,7 +451,7 @@ const HomeScreen = ({ navigation }) => {
             }}
             activeOpacity={1}
           >
-            <Text style={styles.versionText}>v1.0.0 • {t('poweredBy')}</Text>
+            <Text style={styles.versionText}>v{APP_VERSION} • {t('poweredBy')}</Text>
           </TouchableOpacity>
         </ScrollView>
         </View>

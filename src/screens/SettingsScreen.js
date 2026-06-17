@@ -8,6 +8,9 @@ import { useLanguage, LANGUAGES, LANGUAGE_LABELS } from '../context/LanguageCont
 import { FONTS } from '../constants/fonts';
 import MenuButton from '../components/MenuButton';
 import AdBanner from '../components/AdBanner';
+import appConfig from '../../app.json';
+
+const APP_VERSION = appConfig.expo.version; // single source of truth (bumped per release)
 
 const FLAGS = {
   en:   '🇺🇸',
@@ -84,7 +87,7 @@ const SettingsScreen = ({ navigation }) => {
             })}
           </View>
 
-          <Text style={styles.versionText}>v1.0.0 • {t('poweredBy')}</Text>
+          <Text style={styles.versionText}>v{APP_VERSION} • {t('poweredBy')}</Text>
         </ScrollView>
 
         {Platform.OS !== 'web' && (
