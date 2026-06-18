@@ -22,7 +22,7 @@ const ITEM_IMAGES = {
 };
 
 // ── Wallet card ───────────────────────────────────────────────
-const WalletCard = ({ coins, onEarn, earning, adReady }) => {
+const WalletCard = ({ coins, auto, watched, adReady, onEarn, onStop }) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const prevCoins = useRef(coins);
 
@@ -51,25 +51,33 @@ const WalletCard = ({ coins, onEarn, earning, adReady }) => {
         <Text style={styles.walletBalance}>{coins}</Text>
 
         <TouchableOpacity
-          style={[styles.earnBtn, (!adReady || earning) && { opacity: 0.45 }]}
-          onPress={onEarn}
-          disabled={!adReady || earning}
+          style={[styles.earnBtn, (!auto && !adReady) && { opacity: 0.45 }]}
+          onPress={auto ? onStop : onEarn}
+          disabled={!auto && !adReady}
           activeOpacity={0.8}
         >
           <LinearGradient
-            colors={adReady ? ['#7C3AED', '#4F46E5'] : ['#3a3a5a', '#2a2a4a']}
+            colors={auto ? ['#EF4444', '#B91C1C'] : (adReady ? ['#7C3AED', '#4F46E5'] : ['#3a3a5a', '#2a2a4a'])}
             style={styles.earnGradient}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
           >
-            <Image source={COIN_IMG} style={styles.earnIcon} resizeMode="contain" />
-            <Text style={styles.earnText}>
-              {earning ? 'Showing...' : adReady ? 'Earn Coin' : 'Ad loading...'}
-            </Text>
+            {auto ? (
+              <Text style={styles.earnText}>■  Stop</Text>
+            ) : (
+              <>
+                <Image source={COIN_IMG} style={styles.earnIcon} resizeMode="contain" />
+                <Text style={styles.earnText}>{adReady ? 'Earn Coins' : 'Ad loading...'}</Text>
+              </>
+            )}
           </LinearGradient>
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.walletSub}>1 ad view = 10 coins</Text>
+      <Text style={styles.walletSub}>
+        {auto
+          ? `Auto-playing · watched ${watched} (+${watched * 10} coins) · tap Stop to finish`
+          : '1 ad = 10 coins · tap to auto-watch'}
+      </Text>
     </View>
   );
 };
@@ -160,7 +168,9 @@ const StoreScreen = ({ navigation }) => {
   const [items,   setItems]   = useState([]);
   const [skins,   setSkins]   = useState([]);
   const [coins,   setCoins]   = useState(0);
-  const [earning, setEarning] = useState(false);
+  const [auto,    setAuto]    = useState(false);  // auto-watch rewarded loop active
+  const [watched, setWatched] = useState(0);      // ads completed this auto session
+  const showingRef = useRef(false);               // a rewarded ad is on screen now
 
   const refresh = useCallback(async () => {
     const [data, skinData, bal] = await Promise.all([getAllItems(), getAllSkins(), getCoins()]);
@@ -174,26 +184,33 @@ const StoreScreen = ({ navigation }) => {
     // Kick a fresh rewarded load on entry so "Earn Coin" doesn't sit stuck on
     // "Ad loading..." while a long error-backoff runs.
     ensureRewardedLoaded();
-    const unsub = navigation.addListener('focus', () => {
+    const unsubFocus = navigation.addListener('focus', () => {
       refresh();
       ensureRewardedLoaded();
     });
-    return unsub;
+    // Leaving the Store ends any auto-watch session.
+    const unsubBlur = navigation.addListener('blur', () => setAuto(false));
+    return () => { unsubFocus(); unsubBlur(); };
   }, [navigation]);
 
-  const handleEarnCoin = () => {
-    setEarning(true);
-    const onRewarded = async () => {
-      const newBal = await addCoin(10);
-      setCoins(newBal);
-    };
-    const onClosed = () => { setEarning(false); refresh(); };
-    const shown = showRewarded(onRewarded, onClosed);
-    if (!shown) {
-      setEarning(false);
-      Alert.alert('Not Ready', 'Ad not loaded yet, try again.');
-    }
-  };
+  const startAutoEarn = () => { setWatched(0); setAuto(true); };
+  const stopAutoEarn  = () => setAuto(false);
+
+  // Auto-watch loop: while `auto` is on, show a rewarded ad as soon as one is
+  // ready, grant 10 coins per completed view, then chain the next — until the
+  // user taps Stop (or leaves the Store). isRewardedReady flips false→true each
+  // ad (shown → closed → reloaded), re-running this effect to show the next one.
+  useEffect(() => {
+    if (!auto) return;
+    if (showingRef.current) return;                          // an ad is on screen
+    if (!isRewardedReady) { ensureRewardedLoaded(); return; } // wait for next ad
+    showingRef.current = true;
+    const shown = showRewarded(
+      async () => { const b = await addCoin(10); setCoins(b); setWatched(w => w + 1); },
+      () => { showingRef.current = false; refresh(); },
+    );
+    if (!shown) { showingRef.current = false; ensureRewardedLoaded(); }
+  }, [auto, isRewardedReady]);
 
   const handleBuy = async (item) => {
     const ok = await spendCoins(item.price);
@@ -241,9 +258,11 @@ const StoreScreen = ({ navigation }) => {
           {/* Wallet */}
           <WalletCard
             coins={coins}
-            onEarn={handleEarnCoin}
-            earning={earning}
+            auto={auto}
+            watched={watched}
             adReady={isRewardedReady}
+            onEarn={startAutoEarn}
+            onStop={stopAutoEarn}
           />
 
           {/* Owned inventory row */}
