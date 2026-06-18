@@ -131,6 +131,11 @@ export const AdProvider = ({ children, ageGroup }) => {
   // win-streak interstitial for the level-based modes (see recordLevelCleared).
   const winStreakRef = useRef(0);
 
+  // Ground-truth readiness: ask the ad instance itself (library sets `loaded`
+  // internally on the native LOADED event, independent of our JS listeners), so
+  // a missed/mis-mapped listener can't leave us thinking a loaded ad isn't ready.
+  const isInterstitialReady = () => !!(intAdRef.current && intAdRef.current.loaded);
+
   const loadInterstitial = () => {
     if (Platform.OS === 'web') return;
     if (intLoadingRef.current) return; // already loading; don't stack requests
@@ -171,22 +176,32 @@ export const AdProvider = ({ children, ageGroup }) => {
   // mirrors ensureRewardedLoaded (without this, interstitials could never load).
   const ensureInterstitialLoaded = () => {
     if (Platform.OS === 'web') return;
-    if (intLoadedRef.current || intLoadingRef.current) return;
+    if (isInterstitialReady() || intLoadingRef.current) return;
     intRetryRef.current = 0; // entering a game: retry immediately
     loadInterstitial();
   };
 
   const showInterstitial = (onClosed) => {
     if (Platform.OS === 'web') { onClosed?.(); return false; }
-    if (!intLoadedRef.current || !intAdRef.current) {
+    if (!isInterstitialReady()) {
       ensureInterstitialLoaded(); // not ready now — start loading for next time
       onClosed?.();
       return false;
     }
     winStreakRef.current = 0;
     intClosedCbRef.current = onClosed ?? null;
-    intAdRef.current.show();
-    return true;
+    try {
+      intAdRef.current.show();
+      return true;
+    } catch (e) {
+      // show() throws if the native ad isn't actually loaded — never strand the
+      // user: drop the callback, advance, and reload for next time.
+      console.log('[AdContext] interstitial show failed:', e?.message ?? e);
+      intClosedCbRef.current = null;
+      ensureInterstitialLoaded();
+      onClosed?.();
+      return false;
+    }
   };
 
   // ── maybeShowInterstitial ─────────────────────────────────────────────────
@@ -198,7 +213,7 @@ export const AdProvider = ({ children, ageGroup }) => {
   // Either branch calls `advance` exactly once, so callers never call it again.
   const maybeShowInterstitial = async (advance) => {
     if (Platform.OS === 'web') { advance?.(); return; }
-    if (!intLoadedRef.current || !intAdRef.current) {
+    if (!isInterstitialReady()) {
       ensureInterstitialLoaded();
       advance?.();
       return;
