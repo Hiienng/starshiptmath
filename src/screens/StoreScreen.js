@@ -9,7 +9,7 @@ import {
   getAllItems, getAllSkins, getCoins, addCoin, spendCoins, grantItem,
   unlockSkin, setActiveSkin,
 } from '../utils/itemStorage';
-import MenuButton from '../components/MenuButton';
+import BottomNav from '../components/BottomNav';
 import AdBanner from '../components/AdBanner';
 
 const COIN_IMG   = require('../../assets/coin.png');
@@ -228,10 +228,6 @@ const StoreScreen = ({ navigation }) => {
       <StatusBar barStyle="light-content" backgroundColor="#050510" />
       <LinearGradient colors={['#050510', '#0a0a1a', '#0f0f2a']} style={styles.gradient}>
 
-        <View style={styles.topHeader}>
-          <MenuButton navigation={navigation} activeTab="Store" />
-        </View>
-
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
@@ -283,11 +279,10 @@ const StoreScreen = ({ navigation }) => {
           </View>
         </ScrollView>
 
-        {Platform.OS !== 'web' && (
-          <View style={styles.adBannerWrap}>
-            <AdBanner />
-          </View>
-        )}
+        <View style={styles.bottomDock} pointerEvents="box-none">
+          <BottomNav navigation={navigation} activeTab="Store" />
+          {Platform.OS !== 'web' && <AdBanner />}
+        </View>
       </LinearGradient>
 
     </View>
@@ -302,8 +297,8 @@ const styles = StyleSheet.create({
   scroll:    { flex: 1 },
   scrollContent: {
     paddingHorizontal: 18,
-    paddingTop: Platform.OS === 'ios' ? 110 : 100,
-    paddingBottom: 24,
+    paddingTop: Platform.OS === 'ios' ? 70 : 60,
+    paddingBottom: 150,
   },
   topHeader: {
     position: 'absolute',
@@ -311,8 +306,10 @@ const styles = StyleSheet.create({
     left: 16,
     zIndex: 10,
   },
-  adBannerWrap: {
-    paddingBottom: Platform.OS === 'ios' ? 24 : 12,
+  bottomDock: {
+    position: 'absolute',
+    left: 0, right: 0, bottom: 0,
+    paddingBottom: Platform.OS === 'ios' ? 22 : 10,
   },
 
   pageTitle: {

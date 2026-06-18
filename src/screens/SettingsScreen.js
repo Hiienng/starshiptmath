@@ -6,7 +6,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLanguage, LANGUAGES, LANGUAGE_LABELS } from '../context/LanguageContext';
 import { FONTS } from '../constants/fonts';
-import MenuButton from '../components/MenuButton';
+import BottomNav from '../components/BottomNav';
 import AdBanner from '../components/AdBanner';
 import appConfig from '../../app.json';
 
@@ -35,9 +35,7 @@ const SettingsScreen = ({ navigation }) => {
       >
         {/* Header — hamburger menu + centred glow card */}
         <View style={styles.headerWrap}>
-          <View style={styles.menuBtnWrap}>
-            <MenuButton navigation={navigation} activeTab="Settings" />
-          </View>
+          <View style={styles.menuBtnWrap} />
           <View style={styles.headerCard}>
             <Text style={styles.headerTitle}>{t('settings').toUpperCase()}</Text>
           </View>
@@ -90,11 +88,10 @@ const SettingsScreen = ({ navigation }) => {
           <Text style={styles.versionText}>v{APP_VERSION} • {t('poweredBy')}</Text>
         </ScrollView>
 
-        {Platform.OS !== 'web' && (
-          <View style={styles.adBannerWrap}>
-            <AdBanner />
-          </View>
-        )}
+        <View style={styles.bottomDock} pointerEvents="box-none">
+          <BottomNav navigation={navigation} activeTab="Settings" />
+          {Platform.OS !== 'web' && <AdBanner />}
+        </View>
       </LinearGradient>
     </View>
   );
@@ -136,7 +133,7 @@ const styles = StyleSheet.create({
   },
 
   scroll: { flex: 1 },
-  scrollContent: { padding: 20, paddingBottom: 100 },
+  scrollContent: { padding: 20, paddingBottom: 150 },
 
   sectionLabel: {
     fontFamily: FONTS.displaySemi,
@@ -193,8 +190,10 @@ const styles = StyleSheet.create({
     color: 'rgba(184,184,212,0.35)',
     fontSize: 11, textAlign: 'center', marginTop: 30,
   },
-  adBannerWrap: {
-    paddingBottom: Platform.OS === 'ios' ? 24 : 12,
+  bottomDock: {
+    position: 'absolute',
+    left: 0, right: 0, bottom: 0,
+    paddingBottom: Platform.OS === 'ios' ? 22 : 10,
   },
 });
 

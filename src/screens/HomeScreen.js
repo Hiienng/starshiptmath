@@ -19,7 +19,7 @@ import { useLanguage, LANGUAGES } from '../context/LanguageContext';
 import { loadSounds, playSound } from '../utils/soundManager';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FONTS } from '../constants/fonts';
-import MenuButton from '../components/MenuButton';
+import BottomNav from '../components/BottomNav';
 import BuyCoinsModal from '../components/BuyCoinsModal';
 import AdBanner from '../components/AdBanner';
 import appConfig from '../../app.json';
@@ -356,7 +356,7 @@ const HomeScreen = ({ navigation }) => {
               hero content so its edges stay aligned with the cards below,
               regardless of heroScale */}
           <View style={[styles.topHeader, isTablet && { paddingHorizontal: 20 + SW * 0.06 }]}>
-            <MenuButton navigation={navigation} activeTab="Home" style={{ height: 49 }} />
+            <View style={{ width: 44, height: 49 }} />
 
             <View style={styles.coinPill}>
               <Image source={COIN_IMG} style={styles.coinPillIcon} resizeMode="contain" />
@@ -456,9 +456,10 @@ const HomeScreen = ({ navigation }) => {
         </ScrollView>
         </View>
 
-        {Platform.OS !== 'web' && (
-          <AdBanner style={styles.adBanner} />
-        )}
+        <View style={styles.bottomDock} pointerEvents="box-none">
+          <BottomNav navigation={navigation} activeTab="Home" />
+          {Platform.OS !== 'web' && <AdBanner />}
+        </View>
       </LinearGradient>
     </View>
   );
@@ -613,7 +614,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 80,
+    paddingBottom: 150,
   },
   heroFixed: {
     width: '100%',
@@ -842,11 +843,10 @@ const styles = StyleSheet.create({
     color: 'rgba(108, 99, 255, 0.5)',
     letterSpacing: 1,
   },
-  adBanner: {
+  bottomDock: {
     position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+    left: 0, right: 0, bottom: 0,
+    paddingBottom: Platform.OS === 'ios' ? 22 : 10,
   },
 
 });
