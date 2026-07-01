@@ -9,9 +9,9 @@ import { getCoins, spendCoins } from '../utils/itemStorage';
 
 const COIN_IMG = require('../../assets/coin.png');
 
-// TEMP on-screen interstitial diagnostics. Set to false (or delete) to hide the
-// floating badge once we've found the root cause of the missing interstitial.
-const AD_DEBUG = true;
+// On-screen interstitial diagnostics badge. MUST stay false for production —
+// flip to true only in a development (test-ads) build to diagnose ad loading.
+const AD_DEBUG = false;
 
 // ── Exponential backoff: 30s → 60s → 120s → cap at 120s ──────────────────────
 const BACKOFF_BASE_MS  = 30_000;
