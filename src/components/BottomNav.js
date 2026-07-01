@@ -69,7 +69,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignSelf: 'stretch',
     marginHorizontal: 16,
-    marginBottom: 8,
+    marginBottom: 16, // keep clear separation from the ad banner (accidental-click policy)
     backgroundColor: 'rgba(22,23,46,0.96)',
     borderRadius: 26,
     borderWidth: 1,
