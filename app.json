@@ -2,8 +2,8 @@
   "expo": {
     "name": "Starship Math",
     "slug": "startship-math",
-    "version": "1.3.2",
-    "runtimeVersion": "1.3.2",
+    "version": "1.3.3",
+    "runtimeVersion": "1.3.3",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "icon": "./assets/icon.png",
@@ -21,7 +21,7 @@
     },
     "android": {
       "package": "com.starshipmath.app",
-      "versionCode": 22,
+      "versionCode": 23,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#050510"
