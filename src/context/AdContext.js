@@ -140,6 +140,7 @@ export const AdProvider = ({ children, ageGroup }) => {
     if (Platform.OS === 'web') return;
     if (intLoadingRef.current) return; // already loading; don't stack requests
     intLoadingRef.current = true;
+    console.log('[AD-INT] loadInterstitial() → requesting', AD_UNIT_IDS.INTERSTITIAL, 'npa=', npa);
 
     const ad = InterstitialAd.createForAdRequest(AD_UNIT_IDS.INTERSTITIAL, AD_REQUEST_OPTIONS);
 
@@ -147,10 +148,12 @@ export const AdProvider = ({ children, ageGroup }) => {
       intRetryRef.current = 0;
       intLoadingRef.current = false;
       intLoadedRef.current = true;
+      console.log('[AD-INT] LOADED ✓ ready to show');
     });
 
     ad.addAdEventListener(AdEventType.CLOSED, () => {
       intLoadedRef.current = false;
+      console.log('[AD-INT] CLOSED → reloading next');
       const cb = intClosedCbRef.current;
       intClosedCbRef.current = null;
       cb?.();
@@ -162,7 +165,7 @@ export const AdProvider = ({ children, ageGroup }) => {
       intLoadedRef.current = false;
       const delay = nextBackoff(intRetryRef.current);
       intRetryRef.current = Math.min(intRetryRef.current + 1, 4);
-      console.log(`[AdContext] Interstitial error (retry in ${delay / 1000}s):`, error?.code ?? error);
+      console.log(`[AD-INT] ERROR (retry ${delay / 1000}s) code=`, error?.code, 'msg=', error?.message ?? error);
       setTimeout(loadInterstitial, delay);
     });
 
@@ -176,6 +179,7 @@ export const AdProvider = ({ children, ageGroup }) => {
   // mirrors ensureRewardedLoaded (without this, interstitials could never load).
   const ensureInterstitialLoaded = () => {
     if (Platform.OS === 'web') return;
+    console.log('[AD-INT] ensureInterstitialLoaded: ready=', isInterstitialReady(), 'loading=', intLoadingRef.current);
     if (isInterstitialReady() || intLoadingRef.current) return;
     intRetryRef.current = 0; // entering a game: retry immediately
     loadInterstitial();
@@ -213,7 +217,9 @@ export const AdProvider = ({ children, ageGroup }) => {
   // Either branch calls `advance` exactly once, so callers never call it again.
   const maybeShowInterstitial = async (advance) => {
     if (Platform.OS === 'web') { advance?.(); return; }
+    console.log('[AD-INT] maybeShowInterstitial: ready=', isInterstitialReady(), 'adRef=', !!intAdRef.current, 'loading=', intLoadingRef.current);
     if (!isInterstitialReady()) {
+      console.log('[AD-INT] → NOT READY, advancing without ad');
       ensureInterstitialLoaded();
       advance?.();
       return;
@@ -221,8 +227,10 @@ export const AdProvider = ({ children, ageGroup }) => {
     let coins = 0;
     try { coins = await getCoins(); } catch {}
     if (coins >= AD_CONFIG.AD_SKIP_COST) {
+      console.log('[AD-INT] → ready + coins', coins, '≥', AD_CONFIG.AD_SKIP_COST, '→ showing skip modal');
       setSkipPrompt({ advance, coins });
     } else {
+      console.log('[AD-INT] → ready + coins', coins, '< skip cost → showing ad');
       showInterstitial(advance);
     }
   };
@@ -243,6 +251,7 @@ export const AdProvider = ({ children, ageGroup }) => {
   const recordLevelCleared = (advance) => {
     if (Platform.OS === 'web') { advance?.(); return; }
     winStreakRef.current += 1;
+    console.log('[AD-INT] recordLevelCleared: winStreak=', winStreakRef.current, '/', AD_CONFIG.WIN_STREAK_FOR_AD);
     if (winStreakRef.current >= AD_CONFIG.WIN_STREAK_FOR_AD) {
       winStreakRef.current = 0;
       maybeShowInterstitial(advance);
@@ -300,9 +309,11 @@ export const AdProvider = ({ children, ageGroup }) => {
         });
         await mobileAds().initialize();
         if (cancelled) return;
+        console.log('[AD-INT] SDK initialized (ageGroup=', ageGroup, ') → loading rewarded + interstitial');
         loadRewarded();
         loadInterstitial();
       } catch (e) {
+        console.log('[AD-INT] init/initialize FAILED:', e?.message ?? e);
         const delay = nextBackoff(initRetryAttempt);
         initRetryAttempt = Math.min(initRetryAttempt + 1, 4);
         console.log(`[AdContext] init failed (retry in ${delay / 1000}s):`, e?.message ?? e);
