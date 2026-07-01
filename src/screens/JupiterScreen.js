@@ -216,6 +216,18 @@ const pickFromBucket = (pool, bucket) => {
 
 let _tid = 0;
 
+// Memoized ship. JupiterScreen re-renders very frequently (falling tiles,
+// score, per-second clock, tile catches). Its ship uses a native-driven
+// translateX; reconciling that view on every parent re-render made it
+// jitter/snap horizontally each frame. Isolating it behind React.memo with
+// stable props (the Animated.Value, a fixed top, the skin image) stops the
+// re-renders so the native animation stays smooth.
+const Ship = React.memo(({ shipAnim, top, imgSrc }) => (
+  <Animated.View style={[styles.ship, { top, transform: [{ translateX: shipAnim }] }]}>
+    <Image source={imgSrc} style={{ width: SHIP_W, height: SHIP_H }} resizeMode="contain" />
+  </Animated.View>
+));
+
 export default function JupiterScreen({ route, navigation }) {
   const { level: initLevel = 1 } = route?.params ?? {};
   const { recordGameOver, recordLevelCleared, ensureInterstitialLoaded } = useAd();
@@ -767,13 +779,8 @@ export default function JupiterScreen({ route, navigation }) {
         </TouchableOpacity>
       </View>
 
-      {/* ship */}
-      <Animated.View style={[styles.ship, {
-        top: shipY - SHIP_H / 2,
-        transform: [{ translateX: shipAnim }],
-      }]}>
-        <Image source={imgSrc} style={{ width: SHIP_W, height: SHIP_H }} resizeMode="contain" />
-      </Animated.View>
+      {/* ship — memoized so frequent re-renders don't jitter the native transform */}
+      <Ship shipAnim={shipAnim} top={shipY - SHIP_H / 2} imgSrc={imgSrc} />
 
       {/* pause overlay */}
       {paused && (
