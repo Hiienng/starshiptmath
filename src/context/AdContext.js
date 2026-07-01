@@ -9,6 +9,10 @@ import { getCoins, spendCoins } from '../utils/itemStorage';
 
 const COIN_IMG = require('../../assets/coin.png');
 
+// TEMP on-screen interstitial diagnostics. Set to false (or delete) to hide the
+// floating badge once we've found the root cause of the missing interstitial.
+const AD_DEBUG = true;
+
 // ── Exponential backoff: 30s → 60s → 120s → cap at 120s ──────────────────────
 const BACKOFF_BASE_MS  = 30_000;
 const BACKOFF_MAX_MS   = 120_000;
@@ -43,6 +47,7 @@ export const AdProvider = ({ children, ageGroup }) => {
   // we render a modal offering "pay coins to skip" vs "watch ad". Holds the
   // pending `advance` callback (and the coin balance, for display) while open.
   const [skipPrompt, setSkipPrompt] = useState(null); // { advance, coins } | null
+  const [intDebug, setIntDebug] = useState('INT init'); // on-screen diagnostic string
 
   const AD_REQUEST_OPTIONS = {
     requestNonPersonalizedAdsOnly: npa,
@@ -140,7 +145,9 @@ export const AdProvider = ({ children, ageGroup }) => {
     if (Platform.OS === 'web') return;
     if (intLoadingRef.current) return; // already loading; don't stack requests
     intLoadingRef.current = true;
+    const unitTail = String(AD_UNIT_IDS.INTERSTITIAL).slice(-7);
     console.log('[AD-INT] loadInterstitial() → requesting', AD_UNIT_IDS.INTERSTITIAL, 'npa=', npa);
+    setIntDebug(`INT loading …${unitTail}`);
 
     const ad = InterstitialAd.createForAdRequest(AD_UNIT_IDS.INTERSTITIAL, AD_REQUEST_OPTIONS);
 
@@ -149,11 +156,13 @@ export const AdProvider = ({ children, ageGroup }) => {
       intLoadingRef.current = false;
       intLoadedRef.current = true;
       console.log('[AD-INT] LOADED ✓ ready to show');
+      setIntDebug('INT READY ✓');
     });
 
     ad.addAdEventListener(AdEventType.CLOSED, () => {
       intLoadedRef.current = false;
       console.log('[AD-INT] CLOSED → reloading next');
+      setIntDebug('INT closed→reload');
       const cb = intClosedCbRef.current;
       intClosedCbRef.current = null;
       cb?.();
@@ -166,6 +175,7 @@ export const AdProvider = ({ children, ageGroup }) => {
       const delay = nextBackoff(intRetryRef.current);
       intRetryRef.current = Math.min(intRetryRef.current + 1, 4);
       console.log(`[AD-INT] ERROR (retry ${delay / 1000}s) code=`, error?.code, 'msg=', error?.message ?? error);
+      setIntDebug(`INT ERR code=${error?.code ?? '?'}`);
       setTimeout(loadInterstitial, delay);
     });
 
@@ -220,6 +230,7 @@ export const AdProvider = ({ children, ageGroup }) => {
     console.log('[AD-INT] maybeShowInterstitial: ready=', isInterstitialReady(), 'adRef=', !!intAdRef.current, 'loading=', intLoadingRef.current);
     if (!isInterstitialReady()) {
       console.log('[AD-INT] → NOT READY, advancing without ad');
+      setIntDebug(`INT NOT-READY@moment (load=${intLoadingRef.current})`);
       ensureInterstitialLoaded();
       advance?.();
       return;
@@ -228,9 +239,11 @@ export const AdProvider = ({ children, ageGroup }) => {
     try { coins = await getCoins(); } catch {}
     if (coins >= AD_CONFIG.AD_SKIP_COST) {
       console.log('[AD-INT] → ready + coins', coins, '≥', AD_CONFIG.AD_SKIP_COST, '→ showing skip modal');
+      setIntDebug(`INT show MODAL (coins ${coins})`);
       setSkipPrompt({ advance, coins });
     } else {
       console.log('[AD-INT] → ready + coins', coins, '< skip cost → showing ad');
+      setIntDebug(`INT SHOW ad (coins ${coins})`);
       showInterstitial(advance);
     }
   };
@@ -252,6 +265,7 @@ export const AdProvider = ({ children, ageGroup }) => {
     if (Platform.OS === 'web') { advance?.(); return; }
     winStreakRef.current += 1;
     console.log('[AD-INT] recordLevelCleared: winStreak=', winStreakRef.current, '/', AD_CONFIG.WIN_STREAK_FOR_AD);
+    setIntDebug(`INT clr ${winStreakRef.current}/${AD_CONFIG.WIN_STREAK_FOR_AD} ready=${isInterstitialReady()}`);
     if (winStreakRef.current >= AD_CONFIG.WIN_STREAK_FOR_AD) {
       winStreakRef.current = 0;
       maybeShowInterstitial(advance);
@@ -453,6 +467,13 @@ export const AdProvider = ({ children, ageGroup }) => {
           </View>
         </View>
       </Modal>
+
+      {/* TEMP on-screen interstitial diagnostic badge (AD_DEBUG). */}
+      {AD_DEBUG && Platform.OS !== 'web' && (
+        <View pointerEvents="none" style={adStyles.debugBadge}>
+          <Text style={adStyles.debugTxt}>{intDebug}</Text>
+        </View>
+      )}
     </AdContext.Provider>
   );
 };
@@ -493,6 +514,20 @@ const adStyles = StyleSheet.create({
     alignItems: 'center',
   },
   watchTxt: { fontSize: 15, fontWeight: '800', color: '#fff' },
+
+  // TEMP diagnostic badge — top of screen, non-interactive.
+  debugBadge: {
+    position: 'absolute',
+    top: 44, left: 8, right: 8,
+    alignItems: 'center',
+    zIndex: 9999, elevation: 9999,
+  },
+  debugTxt: {
+    fontSize: 11, fontWeight: '700', color: '#7CFF7C',
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6,
+    overflow: 'hidden',
+  },
 });
 
 export const useAd = () => useContext(AdContext);
