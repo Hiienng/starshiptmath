@@ -11,34 +11,44 @@ context in under a minute. If you also want the raw memory files, copy
 `~/.claude/projects/-Users-hienem-Downloads-starshipmath/memory/` to the new
 device once the new working-directory hash exists.
 
-## Read this before deleting the local `Downloads/starshipmath` folder
+## Status: `otherasset/` and `versionaab/` are already gone (2026-07-21)
 
-Only this folder (`starshiptmath/`) is a git repo. Its parent
-`Downloads/starshipmath/` also contains three things that are **not tracked
-anywhere** and will be **permanently lost** if you delete the parent folder
-without backing them up first:
+The parent `Downloads/starshipmath/` folder used to also hold `otherasset/`
+(~38MB marketing assets) and `versionaab/` (~123MB archived `.aab` builds) —
+neither was ever tracked by git. Both were deleted on 2026-07-21 as part of
+workspace cleanup. Before deletion, the two pieces judged worth keeping were
+rescued into this repo:
 
-- `../CLAUDE.md` — the project instructions Claude Code reads for this repo
-  (layout, build commands, versioning steps, architecture map, design rules,
-  Play Store / AdMob age-gate compliance rules). Copy it into this repo (or
-  into the new workspace root) before deleting.
-- `../otherasset/` (~38MB) — marketing/store-listing images, screen
-  recordings, `GROWTH_STRATEGY.md`, `PLAY_LISTING.md`, `ProductPlan for
-  V8.docx`, plus an `unused_assets/` subfolder of already-retired icons.
-- `../versionaab/` (~123MB) — archived `.aab` build artifacts (ver7, ver8,
-  ver10, ver17), reference-only, not reproducible without rebuilding from
-  historical commits/tags (no tags currently exist for these).
+- The `versionCode 8` (v1.1.0) production AAB → **GitHub Release**, not the
+  git tree (avoids bloating repo history with a 60MB binary): see
+  [`android-versionCode-8`](https://github.com/Hiienng/starshiptmath/releases/tag/android-versionCode-8),
+  tagged at commit `2b3c363` (the commit it was actually built from — the
+  bump from versionCode 7→8 was never its own git commit).
+- The mascot source art (`mascos_motion2.png`, `mascos_motion_1.png`) →
+  `docs/source-art/` in this repo.
 
-**Recommendation:** zip `otherasset/`, `versionaab/`, and `CLAUDE.md`
-somewhere durable (cloud drive, external disk) before deleting the parent
-folder, or at minimum copy `CLAUDE.md` into this repo and commit it.
+Everything else that was in those two folders (ver7/ver10/ver17 AABs,
+`GROWTH_STRATEGY.md`, `PLAY_LISTING.md`, `ProductPlan for V8.docx`, screen
+recordings, `unused_assets/`) is gone and was **not** backed up elsewhere —
+if you need any of it, it doesn't exist anymore short of the user's own
+memory/other copies.
+
+`../CLAUDE.md` (workspace-root project instructions) is **still present**
+and still not git-tracked — same risk as before. Recommended: move it into
+this repo (e.g. `starshiptmath/CLAUDE.md`) and trim its "Repository layout"
+section, which still describes the now-deleted sibling folders. Now that
+`otherasset/`/`versionaab/` are gone, the original reason it lived a level
+up (to document multiple sibling folders) mostly no longer applies.
 
 ## Repo state (as of 2026-07-21)
 
 - Correct remote: `https://github.com/Hiienng/starshiptmath.git`
   (note the folder-matching spelling `starshiptmath`, not `starshipmath`)
-- Branch `main`, pushed through commit `15ea66d`
+- Branch `main`, pushed through commit `11275ea`
 - On a new device: `git clone https://github.com/Hiienng/starshiptmath.git`
+- Regenerable local caches not worth backing up: `node_modules/` (~410M,
+  `npm install`), `ios/Pods/` (~383M, `pod install`), `.expo/` (~5.4M),
+  `dist/` (~2.4M, build output) — all gitignored, all safe to delete anytime.
 
 ## Backlog / known issues
 
@@ -65,6 +75,9 @@ folder, or at minimum copy `CLAUDE.md` into this repo and commit it.
   app: `src/components/GameOverTransition.js`, `src/components/MenuButton.js`.
 - Swept every file under `src/` and every asset/sound file for actual
   references — nothing else came up dead.
+- Deleted `otherasset/` and `versionaab/` from the local workspace; rescued
+  the ver8 AAB (as a GitHub Release) and mascot source art (into
+  `docs/source-art/`) first — see the status section above.
 
 ## Architecture quick-reference
 
