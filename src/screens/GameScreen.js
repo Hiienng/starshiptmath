@@ -135,6 +135,17 @@ const GameScreen = ({ route, navigation }) => {
   const [skinPickerOpen,   setSkinPickerOpen]   = useState(false);
   const pickerAnim = useRef(new Animated.Value(0)).current;
 
+  // Background ship reaction: 'cruise' default; pulse 'celebrate'/'hit' on
+  // answers, then settle back to cruise.
+  const [shipState, setShipState] = useState('cruise');
+  const shipResetRef = useRef(null);
+  const pulseShipState = (s) => {
+    setShipState(s);
+    if (shipResetRef.current) clearTimeout(shipResetRef.current);
+    shipResetRef.current = setTimeout(() => setShipState('cruise'), 900);
+  };
+  useEffect(() => () => { if (shipResetRef.current) clearTimeout(shipResetRef.current); }, []);
+
   const loadSkin = async () => {
     const skinId = await getActiveSkin();
     const allSkins = await getAllSkins();
@@ -396,6 +407,7 @@ const GameScreen = ({ route, navigation }) => {
     ]);
 
     shakeAnimation();
+    pulseShipState('hit');
     setLivesLeft((prev) => {
       const next = prev - 1;
       if (next <= 0) {
@@ -420,6 +432,7 @@ const GameScreen = ({ route, navigation }) => {
     if (isCorrect) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       playSound('correct');
+      pulseShipState('celebrate');
       const points = calculateScore(true, timeLeft, effectiveTime);
       showScorePopup(points);
       setScore((prev) => prev + points);
@@ -441,6 +454,7 @@ const GameScreen = ({ route, navigation }) => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       playSound('wrong');
       shakeAnimation();
+      pulseShipState('hit');
       setLivesLeft((prev) => {
         const next = prev - 1;
         if (next <= 0) {
@@ -691,6 +705,7 @@ const GameScreen = ({ route, navigation }) => {
   if (!currentQuestion) {
     return (
       <View style={styles.loadingContainer}>
+        <SpaceBackground shipState="idle" />
         <Text style={styles.loadingText}>Loading...</Text>
       </View>
     );
@@ -704,7 +719,7 @@ const GameScreen = ({ route, navigation }) => {
         colors={[COLORS.background, COLORS.backgroundLight]}
         style={styles.backgroundGradient}
       >
-        <SpaceBackground shipSource={activeSkinSource} />
+        <SpaceBackground shipSource={activeSkinSource} shipState={shipState} />
 
           {/* Header — ✕ + centred glow card + pause (row, vertically centred) */}
         <View style={[styles.headerWrap, isTablet && { paddingHorizontal: 12 + contentSideInset }]}>

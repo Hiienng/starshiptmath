@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, memo } from 'react';
 import { View, Image, Animated, Easing, StyleSheet, Dimensions } from 'react-native';
+import AnimatedShip from './AnimatedShip';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 
@@ -103,65 +104,8 @@ const FloatingObject = memo(({ source, size, startX, duration, initDelay }) => {
   );
 });
 
-// ── Main starship — right side, larger float amplitude ────────────────────
-const SHIP_SIZE = 88;
-const SHIP_X    = SW * 0.78;   // right side
-const SHIP_MID  = SH * 0.14;  // vertically near header
-const SHIP_AMP  = 18;          // larger amplitude
-
-const MainStarship = memo(({ source }) => {
-  const shipY = useRef(new Animated.Value(SHIP_MID - SHIP_AMP)).current;
-  const alive = useRef(true);
-
-  useEffect(() => {
-    alive.current = true;
-    const animate = () => {
-      if (!alive.current) return;
-      Animated.sequence([
-        Animated.timing(shipY, {
-          toValue: SHIP_MID + SHIP_AMP,
-          duration: 2000,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(shipY, {
-          toValue: SHIP_MID - SHIP_AMP,
-          duration: 2000,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ]).start(({ finished }) => {
-        if (finished && alive.current) animate();
-      });
-    };
-    animate();
-    return () => { alive.current = false; };
-  }, []);
-
-  return (
-    <Animated.View
-      pointerEvents="none"
-      style={{
-        position: 'absolute',
-        width: SHIP_SIZE,
-        height: SHIP_SIZE,
-        left: SHIP_X,
-        top: 0,
-        opacity: 0.65,
-        transform: [{ translateY: shipY }],
-      }}
-    >
-      <Image
-        source={source ?? require('../../assets/mainobj.png')}
-        style={{ width: SHIP_SIZE, height: SHIP_SIZE }}
-        resizeMode="contain"
-      />
-    </Animated.View>
-  );
-});
-
 // ── Exported component ────────────────────────────────────────────────────
-const SpaceBackground = ({ shipSource }) => (
+const SpaceBackground = ({ shipSource, shipState = 'cruise' }) => (
   <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
     {STARS.map(s => <WarpStar key={s.id} {...s} />)}
 
@@ -186,7 +130,7 @@ const SpaceBackground = ({ shipSource }) => (
       size={38} startX={SW * 0.25} duration={14000} initDelay={7000}
     />
 
-    <MainStarship source={shipSource} />
+    <AnimatedShip source={shipSource} state={shipState} />
   </View>
 );
 
